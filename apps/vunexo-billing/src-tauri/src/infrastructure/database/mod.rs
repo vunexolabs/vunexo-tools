@@ -1,6 +1,10 @@
 //! SQLite connection pool and migration runner, via SQLx. Repository
-//! implementations (e.g. `SqliteInvoiceRepository`) land here in later
-//! rounds, implementing ports defined in `crate::application`.
+//! implementations here implement the ports defined in
+//! `crate::application::ports`.
+
+pub mod sqlite_business_repository;
+pub mod sqlite_customer_repository;
+pub mod transaction;
 
 use std::path::Path;
 
