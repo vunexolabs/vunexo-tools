@@ -7,6 +7,8 @@ round: 4
 
 This is an AI context file. It fills in the `commands → application → domain → infrastructure` layering locked in `docs/vunexo-billing/architecture.md` with concrete use cases, ports, and module boundaries, built against the locked flows (`user-flows.md`) and schema (`database-schema.md`). It does not implement anything (that's Round 7) and does not decide calculation arithmetic (that's Round 6) — it decides *shape*: what the use cases are, what they depend on, what's transactional, and how errors cross layer boundaries.
 
+**Amendment (during Round 5 review):** designing the UI/UX round surfaced gaps this document had left implicit — `Business`/`Settings`/`TaxRate` repositories and use cases weren't fully specified, list queries weren't named as use cases, and `Customer`/`Product` listing didn't expose what the UI needs to decide archive-vs-delete without guessing. Fixed in §3b, §3c (exact dashboard metric definitions), and §4 below; still `status: locked` since these are corrections to this round's own stated scope, not new scope.
+
 ## Revised dependency graph
 
 ```
@@ -177,9 +179,16 @@ pub trait CustomerRepository: Send + Sync {
     async fn restore(&self, tx: &mut dyn Transaction, id: CustomerId) -> Result<(), InfrastructureError>;
     async fn delete(&self, tx: &mut dyn Transaction, id: CustomerId) -> Result<(), InfrastructureError>; // surfaces ConstraintViolation if referenced by any invoice
     async fn find_by_id(&self, id: CustomerId) -> Result<Option<Customer>, InfrastructureError>;         // plain reads don't need a transaction
-    async fn list(&self, filter: CustomerFilter) -> Result<Vec<Customer>, InfrastructureError>;
+    async fn list(&self, filter: CustomerFilter) -> Result<Vec<CustomerListItem>, InfrastructureError>;
+}
+
+pub struct CustomerListItem {
+    pub customer: Customer,
+    pub has_invoices: bool, // drives the archive-vs-delete UI decision in ui-ux.md §3 — never computed by loading invoices into Rust
 }
 ```
+
+`list`'s `has_invoices` is a single `EXISTS (SELECT 1 FROM invoices WHERE invoices.customer_id = customers.id)` correlated subquery per row in the SQLite implementation — same shape as the `DashboardRepository` rule below (§3c): let SQL answer aggregate/existence questions, don't pull rows into Rust to answer them. `ProductRepository::list()` returns the equivalent `ProductListItem { product: Product, has_invoices: bool }`, computed the same way against `invoice_line_items`.
 
 `InvoiceRepository` replaces the earlier generic `save()` with explicit operations matching the use cases in §4 one-to-one — the repository persists what the use case has already decided, it doesn't infer intent from a blob:
 
@@ -208,7 +217,35 @@ pub trait InvoiceNumberSequencer: Send + Sync {
 }
 ```
 
-`PaymentRepository`, `ProductRepository`, `TaxRateRepository`, `BusinessRepository` (singleton `get`/`update`, no `create`/`delete` — `business` is a fixed single row), `SettingsRepository` (same singleton shape) follow the same shape as `CustomerRepository`.
+`PaymentRepository` and `ProductRepository` follow the same shape as `CustomerRepository` (`ProductRepository::list` returning `ProductListItem`, per above).
+
+Three ports don't fit that shape and were under-specified in the first draft of this document — worth being precise now rather than letting Round 7 guess:
+
+```rust
+#[async_trait]
+pub trait BusinessRepository: Send + Sync {
+    async fn create(&self, tx: &mut dyn Transaction, business: NewBusiness) -> Result<Business, InfrastructureError>; // called exactly once, by first-run setup
+    async fn get(&self) -> Result<Option<Business>, InfrastructureError>; // None is the first-run signal — see user-flows.md §1
+    async fn update(&self, tx: &mut dyn Transaction, changes: BusinessChanges) -> Result<Business, InfrastructureError>;
+    // no delete — a business profile is never removed in V1
+}
+
+#[async_trait]
+pub trait SettingsRepository: Send + Sync {
+    async fn get(&self) -> Result<Settings, InfrastructureError>; // never None — the row is seeded with schema defaults at DB init (infrastructure/database/mod.rs), not created via a use case
+    async fn update(&self, tx: &mut dyn Transaction, changes: SettingsChanges) -> Result<Settings, InfrastructureError>;
+}
+
+#[async_trait]
+pub trait TaxRateRepository: Send + Sync {
+    async fn create(&self, tx: &mut dyn Transaction, tax_rate: NewTaxRate) -> Result<TaxRate, InfrastructureError>;
+    async fn update(&self, tx: &mut dyn Transaction, id: TaxRateId, changes: TaxRateChanges) -> Result<TaxRate, InfrastructureError>;
+    async fn list(&self) -> Result<Vec<TaxRate>, InfrastructureError>;
+    // no delete for V1 — a handful of GST slabs, deliberately not worth the "is it referenced" complexity a delete path would need
+}
+```
+
+`BusinessRepository::get` returning `Option<Business>` (not `Business`) is the load-bearing detail: `user-flows.md` §1's entire first-run gate depends on distinguishing "no business row yet" from "business row exists," so this can't be a singleton-with-guaranteed-row the way `Settings` is. `Settings`, by contrast, has schema-level `DEFAULT`s for every column (`database-schema.md` §13), so its single row is seeded once at database initialization and `get()` never has to handle absence.
 
 ### 3c. Dashboard repository
 
@@ -227,6 +264,18 @@ pub trait DashboardRepository: Send + Sync {
 ```
 
 Implemented by `infrastructure/database/sqlite_dashboard_repository.rs` as `COUNT`/`SUM`/`GROUP BY` queries, never as an in-Rust reduction over a full invoice list.
+
+**Exact metric definitions** (so "sales" doesn't quietly mean something different in the query than in the UI label):
+
+| Metric | Definition |
+|---|---|
+| `today_sales` | `SUM(total_minor)` for invoices with `issued_at`'s date = `today` and `status NOT IN (Draft, Cancelled)`. |
+| `month_sales` | Same, for `issued_at` within the given calendar month. |
+| `outstanding_total` | `SUM(total_minor − amount_paid)` for `status IN (Issued, PartiallyPaid)`, where `amount_paid` is the same `SUM(payments)` per invoice used everywhere else (`database-schema.md` §8) — not a separate definition of "outstanding." |
+| `paid_total` | `SUM(total_minor)` for invoices with `status = Paid` **and** `issued_at` within the given month — "how much of what was billed this month has since been paid," matching the month-scoped dashboard panel, not an all-time figure. |
+| `overdue_summary` | count + `SUM(total_minor − amount_paid)` for invoices matching the `is_overdue` predicate from `database-schema.md` §8 exactly — not a redefinition. |
+
+`Draft` and `Cancelled` invoices never contribute to any of these — an unissued or voided invoice was never a sale.
 
 ## 4. Use cases (application layer)
 
@@ -248,6 +297,14 @@ One function/struct per entry below; each takes its repositories by `Arc<dyn Tra
 - `DeleteCustomer` / `DeleteProduct` — attempts a hard delete; the repository's `ON DELETE RESTRICT` backstop surfaces as `InfrastructureError::ConstraintViolation`, which the use case translates into `ApplicationError::Conflict` ("archive instead?") rather than letting a raw DB error reach the UI.
 
 **Invariant, stated explicitly because it isn't obvious from the schema alone:** `UpdateCustomer` and `UpdateProduct` only ever write to `customers`/`products`. Neither may reach into `invoices` or `invoice_line_items` to "fix up" existing snapshots — that would silently rewrite history and is exactly what the snapshot design in Round 2/3 exists to prevent. This isn't a technical constraint the database enforces (nothing stops a bug from doing it); it's a rule Round 7's implementation and review must hold itself to.
+
+**Business** (`application/business.rs`) / **Settings** (`application/settings.rs`) / **Tax Rates** (`application/tax_rates.rs`) — missing from the first draft of this document; added here rather than left implicit, since `ui-ux.md` needs them named to build Business Setup and the three Settings screens against:
+- `CreateBusiness` — precondition: `BusinessRepository::get()` returns `None` (enforces "exactly once," even though nothing else in a single-business V1 app would call it twice). Postcondition: the business row exists, gating `user-flows.md` §1 shut for good.
+- `GetBusiness`, `UpdateBusiness` — straightforward; `UpdateBusiness` is the only one requiring no field but has none that are, either — every business-profile field is optional past the initial `CreateBusiness` per `user-flows.md` §1.
+- `GetSettings`, `UpdateSettings` — `UpdateSettings` is where the "`invoice_number_format` becomes read-only after the first issued invoice" rule (`database-schema.md` §7) is enforced: the use case checks for any invoice with `issued_at IS NOT NULL` before allowing that one field to change, rejecting with `ApplicationError::Conflict` otherwise. Every other settings field stays freely editable.
+- `CreateTaxRate`, `UpdateTaxRate`, `ListTaxRates` — plain CRUD-minus-delete, per §3b.
+
+**Queries** — read-only use cases, one per repository read method, named explicitly so every command in §5 still maps to exactly one named use case rather than a handful of commands quietly calling a repository directly: `GetCustomer`, `ListCustomers`, `GetProduct`, `ListProducts`, `GetInvoice`, `ListInvoices`. Each is a thin pass-through (no validation, no transaction) — worth naming precisely because "thin" isn't "absent."
 
 **Payments** (`application/payments.rs`)
 - `RecordPayment`, `UpdatePayment`, `DeletePayment` — each, in one transaction (§7): confirm the parent invoice isn't `Cancelled`, write the payment change, `SUM` payments for the invoice, and call `InvoiceRepository::set_status` with the recalculated status.
@@ -291,6 +348,8 @@ pub struct InvoiceCalculationResult {
 ```
 
 `calculate_invoice` is pure (no repository access, no clock, no randomness) — every input it needs is passed in, which is what makes it independently testable ahead of any UI or database work landing in Round 7.
+
+**The frontend never calculates financial totals.** React renders whatever `InvoiceCalculationResult` the backend returned for the invoice's current line items — it does not reimplement subtotal/discount/tax/total math in TypeScript to show "live" numbers while the user types. A field change goes through `UpdateDraftInvoice`, gets recalculated by `calculate_invoice`, and the response is what's displayed; there is exactly one implementation of invoice math in the entire system. (This does mean every keystroke-adjacent total update is a round trip to Rust — acceptable for a local Tauri app with no network latency, and the alternative is two implementations of the same arithmetic quietly drifting apart, which is precisely the ₹59,000-vs-₹58,999.99 failure mode the money rules in `.ai/product.md` exist to prevent.) `ui-ux.md` §4's Invoice Editor is built on this rule.
 
 ### 4b. Master-data mutation invariant
 
@@ -349,7 +408,7 @@ The contract this locks: **a restore either succeeds completely or leaves the ex
 
 ## 5. Tauri command surface
 
-Commands in `commands/` mirror the use cases in §4 by name (`create_draft_invoice`, `update_draft_invoice`, `issue_invoice`, `duplicate_invoice`, `cancel_invoice`, `delete_draft_invoice`, `record_payment`, `update_payment`, `delete_payment`, `create_customer`/`update_customer`/`archive_customer`/`restore_customer`/`delete_customer` and the `*_product` equivalents, `get_dashboard_metrics`, `backup_database`, `restore_backup`). The binding rule isn't "exactly one use case call" as a rigid ceiling — a command could legitimately do a little orchestration later — it's the stronger, actually-enforceable boundary from Round 1: **Tauri commands contain no business rules, persistence logic, or calculation logic; they translate transport input/output and invoke application-layer behavior.**
+Commands in `commands/` mirror the use cases in §4 by name (`create_draft_invoice`, `update_draft_invoice`, `issue_invoice`, `duplicate_invoice`, `cancel_invoice`, `delete_draft_invoice`, `get_invoice`, `list_invoices`, `record_payment`, `update_payment`, `delete_payment`, `create_customer`/`update_customer`/`archive_customer`/`restore_customer`/`delete_customer`/`get_customer`/`list_customers` and the `*_product` equivalents, `create_business`/`get_business`/`update_business`, `get_settings`/`update_settings`, `create_tax_rate`/`update_tax_rate`/`list_tax_rates`, `get_dashboard_metrics`, `backup_database`, `restore_backup`). The binding rule isn't "exactly one use case call" as a rigid ceiling — a command could legitimately do a little orchestration later — it's the stronger, actually-enforceable boundary from Round 1: **Tauri commands contain no business rules, persistence logic, or calculation logic; they translate transport input/output and invoke application-layer behavior.**
 
 ## 6. Error handling
 
