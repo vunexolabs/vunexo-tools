@@ -6,5 +6,6 @@ pub mod business;
 pub mod customers;
 pub mod error;
 pub mod ports;
+pub mod products;
 
 pub use error::ApplicationError;

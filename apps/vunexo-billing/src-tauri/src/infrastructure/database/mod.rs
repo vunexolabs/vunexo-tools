@@ -4,6 +4,7 @@
 
 pub mod sqlite_business_repository;
 pub mod sqlite_customer_repository;
+pub mod sqlite_product_repository;
 pub mod transaction;
 
 use std::path::Path;

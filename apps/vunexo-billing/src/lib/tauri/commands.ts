@@ -7,6 +7,10 @@ import type {
   CustomerFields,
   CustomerFilter,
   CustomerListItem,
+  Product,
+  ProductFields,
+  ProductFilter,
+  ProductListItem,
 } from "./types";
 
 /** Round 1 technical spike: proves the React -> Tauri -> Rust round trip. */
@@ -52,4 +56,32 @@ export function getCustomer(id: number): Promise<Customer> {
 
 export function listCustomers(filter: CustomerFilter): Promise<CustomerListItem[]> {
   return callCommand<CustomerListItem[]>("list_customers", { filter });
+}
+
+export function createProduct(fields: ProductFields): Promise<Product> {
+  return callCommand<Product>("create_product", { fields });
+}
+
+export function updateProduct(id: number, fields: ProductFields): Promise<Product> {
+  return callCommand<Product>("update_product", { id, fields });
+}
+
+export function archiveProduct(id: number): Promise<void> {
+  return callCommand<void>("archive_product", { id });
+}
+
+export function restoreProduct(id: number): Promise<void> {
+  return callCommand<void>("restore_product", { id });
+}
+
+export function deleteProduct(id: number): Promise<void> {
+  return callCommand<void>("delete_product", { id });
+}
+
+export function getProduct(id: number): Promise<Product> {
+  return callCommand<Product>("get_product", { id });
+}
+
+export function listProducts(filter: ProductFilter): Promise<ProductListItem[]> {
+  return callCommand<ProductListItem[]>("list_products", { filter });
 }

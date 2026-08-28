@@ -8,3 +8,4 @@ pub mod calculation;
 pub mod customer;
 pub mod invoice;
 pub mod money;
+pub mod product;

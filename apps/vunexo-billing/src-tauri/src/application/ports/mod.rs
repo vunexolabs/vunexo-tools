@@ -5,4 +5,5 @@
 pub mod business_repository;
 pub mod customer_repository;
 pub mod infrastructure_error;
+pub mod product_repository;
 pub mod transaction;

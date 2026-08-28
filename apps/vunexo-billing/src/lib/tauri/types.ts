@@ -41,6 +41,63 @@ export interface CustomerFilter {
   include_archived: boolean;
 }
 
+export type ProductStatus = "ACTIVE" | "ARCHIVED";
+
+export interface Product {
+  id: number;
+  name: string;
+  sku: string | null;
+  description: string | null;
+  unit: string;
+  price_minor: number;
+  tax_rate_id: number | null;
+  hsn_sac_code: string | null;
+  status: ProductStatus;
+}
+
+export interface ProductFields {
+  name: string;
+  sku: string | null;
+  description: string | null;
+  unit: string;
+  price_minor: number;
+  tax_rate_id: number | null;
+  hsn_sac_code: string | null;
+}
+
+export interface ProductListItem extends Product {
+  has_invoices: boolean;
+}
+
+export interface ProductFilter {
+  include_archived: boolean;
+}
+
+/**
+ * Parses a user-typed rupee amount (e.g. "1234.5") into minor units (paise)
+ * using integer string arithmetic only — no floating point, per the money
+ * rules in .ai/product.md, even for this simple a conversion.
+ */
+export function parseRupeesToMinor(input: string): number {
+  const trimmed = input.trim();
+  if (trimmed === "" || trimmed === "-") return 0;
+  const negative = trimmed.startsWith("-");
+  const unsigned = negative ? trimmed.slice(1) : trimmed;
+  const [wholePartRaw, fracPartRaw = ""] = unsigned.split(".");
+  const wholePart = wholePartRaw === "" ? "0" : wholePartRaw;
+  const fracPart = (fracPartRaw + "00").slice(0, 2);
+  const minor = parseInt(wholePart, 10) * 100 + parseInt(fracPart, 10);
+  return negative ? -minor : minor;
+}
+
+export function formatMinorAsRupees(minor: number): string {
+  const negative = minor < 0;
+  const abs = Math.abs(minor);
+  const whole = Math.floor(abs / 100);
+  const frac = abs % 100;
+  return `${negative ? "-" : ""}${whole}.${frac.toString().padStart(2, "0")}`;
+}
+
 /** application-architecture.md §6 — the shape every command error rejects with. */
 export interface ApplicationErrorPayload {
   kind: "not_found" | "validation" | "conflict" | "infrastructure";

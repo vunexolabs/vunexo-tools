@@ -13,9 +13,12 @@ use application::business::BusinessUseCases;
 use application::customers::CustomerUseCases;
 use application::ports::business_repository::BusinessRepository;
 use application::ports::customer_repository::CustomerRepository;
+use application::ports::product_repository::ProductRepository;
 use application::ports::transaction::TransactionManager;
+use application::products::ProductUseCases;
 use infrastructure::database::sqlite_business_repository::SqliteBusinessRepository;
 use infrastructure::database::sqlite_customer_repository::SqliteCustomerRepository;
+use infrastructure::database::sqlite_product_repository::SqliteProductRepository;
 use infrastructure::database::transaction::SqlxTransactionManager;
 
 fn main() {
@@ -36,10 +39,13 @@ fn main() {
             let business_repo: Arc<dyn BusinessRepository> =
                 Arc::new(SqliteBusinessRepository::new(pool.clone()));
             let customer_repo: Arc<dyn CustomerRepository> =
-                Arc::new(SqliteCustomerRepository::new(pool));
+                Arc::new(SqliteCustomerRepository::new(pool.clone()));
+            let product_repo: Arc<dyn ProductRepository> =
+                Arc::new(SqliteProductRepository::new(pool));
 
             app.manage(BusinessUseCases::new(business_repo, tx_manager.clone()));
-            app.manage(CustomerUseCases::new(customer_repo, tx_manager));
+            app.manage(CustomerUseCases::new(customer_repo, tx_manager.clone()));
+            app.manage(ProductUseCases::new(product_repo, tx_manager));
 
             Ok(())
         })
@@ -55,6 +61,13 @@ fn main() {
             commands::delete_customer,
             commands::get_customer,
             commands::list_customers,
+            commands::create_product,
+            commands::update_product,
+            commands::archive_product,
+            commands::restore_product,
+            commands::delete_product,
+            commands::get_product,
+            commands::list_products,
         ])
         .run(tauri::generate_context!())
         .expect("error while running vunexo-billing");

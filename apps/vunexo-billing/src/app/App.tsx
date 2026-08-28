@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BusinessSetup } from "../features/settings/BusinessSetup";
 import { CustomersList } from "../features/customers/CustomersList";
+import { ProductsList } from "../features/products/ProductsList";
 import { useBusiness } from "../hooks/useBusiness";
 
 type Section = "dashboard" | "invoices" | "customers" | "products" | "settings";
@@ -9,7 +10,7 @@ const SECTIONS: { id: Section; label: string; implemented: boolean }[] = [
   { id: "dashboard", label: "Dashboard", implemented: false },
   { id: "invoices", label: "Invoices", implemented: false },
   { id: "customers", label: "Customers", implemented: true },
-  { id: "products", label: "Products", implemented: false },
+  { id: "products", label: "Products", implemented: true },
   { id: "settings", label: "Settings", implemented: false },
 ];
 
@@ -57,6 +58,7 @@ export function App() {
       </nav>
       <main className="flex-1 p-8">
         {section === "customers" && <CustomersList />}
+        {section === "products" && <ProductsList />}
       </main>
     </div>
   );

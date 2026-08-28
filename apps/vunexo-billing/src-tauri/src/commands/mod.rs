@@ -6,9 +6,11 @@ use tauri::State;
 
 use crate::application::business::BusinessUseCases;
 use crate::application::customers::CustomerUseCases;
+use crate::application::products::ProductUseCases;
 use crate::application::ApplicationError;
 use crate::domain::business::Business;
 use crate::domain::customer::{Customer, CustomerFields, CustomerFilter, CustomerListItem};
+use crate::domain::product::{Product, ProductFields, ProductFilter, ProductListItem};
 
 /// Round 1 technical spike: proves the React -> Tauri -> Rust round trip.
 #[tauri::command]
@@ -94,4 +96,61 @@ pub async fn list_customers(
     filter: CustomerFilter,
 ) -> Result<Vec<CustomerListItem>, ApplicationError> {
     customer_use_cases.list_customers(filter).await
+}
+
+#[tauri::command]
+pub async fn create_product(
+    product_use_cases: State<'_, ProductUseCases>,
+    fields: ProductFields,
+) -> Result<Product, ApplicationError> {
+    product_use_cases.create_product(fields).await
+}
+
+#[tauri::command]
+pub async fn update_product(
+    product_use_cases: State<'_, ProductUseCases>,
+    id: i64,
+    fields: ProductFields,
+) -> Result<Product, ApplicationError> {
+    product_use_cases.update_product(id, fields).await
+}
+
+#[tauri::command]
+pub async fn archive_product(
+    product_use_cases: State<'_, ProductUseCases>,
+    id: i64,
+) -> Result<(), ApplicationError> {
+    product_use_cases.archive_product(id).await
+}
+
+#[tauri::command]
+pub async fn restore_product(
+    product_use_cases: State<'_, ProductUseCases>,
+    id: i64,
+) -> Result<(), ApplicationError> {
+    product_use_cases.restore_product(id).await
+}
+
+#[tauri::command]
+pub async fn delete_product(
+    product_use_cases: State<'_, ProductUseCases>,
+    id: i64,
+) -> Result<(), ApplicationError> {
+    product_use_cases.delete_product(id).await
+}
+
+#[tauri::command]
+pub async fn get_product(
+    product_use_cases: State<'_, ProductUseCases>,
+    id: i64,
+) -> Result<Product, ApplicationError> {
+    product_use_cases.get_product(id).await
+}
+
+#[tauri::command]
+pub async fn list_products(
+    product_use_cases: State<'_, ProductUseCases>,
+    filter: ProductFilter,
+) -> Result<Vec<ProductListItem>, ApplicationError> {
+    product_use_cases.list_products(filter).await
 }
