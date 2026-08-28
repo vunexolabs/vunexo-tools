@@ -1,0 +1,30 @@
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Rust / Tauri
+target/
+apps/*/src-tauri/target/
+apps/*/src-tauri/Cargo.lock.bak
+
+# Tauri build output
+apps/*/src-tauri/gen/
+
+# Local data
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Editors / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
