@@ -7,5 +7,7 @@ pub mod business;
 pub mod calculation;
 pub mod customer;
 pub mod invoice;
+pub mod invoice_line_item;
 pub mod money;
 pub mod product;
+pub mod settings;

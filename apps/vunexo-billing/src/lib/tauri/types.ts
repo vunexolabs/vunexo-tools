@@ -98,6 +98,160 @@ export function formatMinorAsRupees(minor: number): string {
   return `${negative ? "-" : ""}${whole}.${frac.toString().padStart(2, "0")}`;
 }
 
+/** Same integer-string-only approach as parseRupeesToMinor, scaled to 3 decimal places (calculation-engine.md §1's quantity_thousandths). */
+export function parseQuantityToThousandths(input: string): number {
+  const trimmed = input.trim();
+  if (trimmed === "") return 0;
+  const [wholePartRaw, fracPartRaw = ""] = trimmed.split(".");
+  const wholePart = wholePartRaw === "" ? "0" : wholePartRaw;
+  const fracPart = (fracPartRaw + "000").slice(0, 3);
+  return parseInt(wholePart, 10) * 1000 + parseInt(fracPart, 10);
+}
+
+export function formatThousandthsAsQuantity(thousandths: number): string {
+  const whole = Math.floor(thousandths / 1000);
+  const frac = thousandths % 1000;
+  return frac === 0 ? `${whole}` : `${whole}.${frac.toString().padStart(3, "0")}`;
+}
+
+/** Same approach, scaled to basis points (rate x 100 — calculation-engine.md §5). */
+export function parsePercentToBasisPoints(input: string): number {
+  const trimmed = input.trim();
+  if (trimmed === "") return 0;
+  const [wholePartRaw, fracPartRaw = ""] = trimmed.split(".");
+  const wholePart = wholePartRaw === "" ? "0" : wholePartRaw;
+  const fracPart = (fracPartRaw + "00").slice(0, 2);
+  return parseInt(wholePart, 10) * 100 + parseInt(fracPart, 10);
+}
+
+export function formatBasisPointsAsPercent(basisPoints: number): string {
+  const whole = Math.floor(basisPoints / 100);
+  const frac = basisPoints % 100;
+  return frac === 0 ? `${whole}` : `${whole}.${frac.toString().padStart(2, "0")}`;
+}
+
+export type DiscountType = "AMOUNT" | "PERCENTAGE";
+
+export interface Settings {
+  country_code: string;
+  currency_code: string;
+  date_format: string;
+  invoice_number_format: string;
+  default_due_days: number;
+  default_tax_rate_id: number | null;
+}
+
+export interface SettingsFields {
+  country_code: string;
+  currency_code: string;
+  date_format: string;
+  invoice_number_format: string;
+  default_due_days: number;
+  default_tax_rate_id: number | null;
+}
+
+export type InvoiceStatus = "DRAFT" | "ISSUED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
+
+export interface InvoiceLineItem {
+  id: number;
+  product_id: number | null;
+  description: string;
+  unit: string;
+  quantity_thousandths: number;
+  unit_price_minor: number;
+  line_discount_type: DiscountType | null;
+  line_discount_value: number | null;
+  tax_rate_id: number | null;
+  tax_rate_basis_points: number;
+  line_subtotal_minor: number;
+  line_discount_amount_minor: number;
+  invoice_discount_amount_minor: number;
+  taxable_amount_minor: number;
+  line_tax_minor: number;
+  line_total_minor: number;
+  sort_order: number;
+}
+
+/** The raw, pre-calculation shape sent to create_draft_invoice/update_draft_invoice. */
+export interface LineItemInput {
+  product_id: number | null;
+  description: string;
+  unit: string;
+  quantity_thousandths: number;
+  unit_price_minor: number;
+  line_discount_type: DiscountType | null;
+  line_discount_value: number | null;
+  tax_rate_id: number | null;
+  tax_rate_basis_points: number;
+}
+
+export interface Invoice {
+  id: number;
+  invoice_number: string | null;
+  invoice_number_is_custom: boolean;
+  status: InvoiceStatus;
+  customer_id: number | null;
+  customer_snapshot_name: string | null;
+  customer_snapshot_phone: string | null;
+  customer_snapshot_email: string | null;
+  customer_snapshot_address: string | null;
+  customer_snapshot_gstin: string | null;
+  business_snapshot_name: string | null;
+  business_snapshot_address: string | null;
+  business_snapshot_gstin: string | null;
+  business_snapshot_phone: string | null;
+  business_snapshot_email: string | null;
+  business_snapshot_bank_details: string | null;
+  business_snapshot_upi_id: string | null;
+  business_snapshot_logo_path: string | null;
+  is_interstate: boolean;
+  invoice_date: string;
+  due_date: string | null;
+  notes: string | null;
+  terms: string | null;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+  subtotal_minor: number;
+  discount_amount_minor: number;
+  tax_amount_minor: number;
+  total_minor: number;
+  issued_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+}
+
+export interface InvoiceWithLineItems extends Invoice {
+  line_items: InvoiceLineItem[];
+}
+
+export interface InvoiceSummary {
+  id: number;
+  invoice_number: string | null;
+  status: InvoiceStatus;
+  customer_name: string | null;
+  invoice_date: string;
+  due_date: string | null;
+  total_minor: number;
+  amount_paid_minor: number;
+  is_overdue: boolean;
+}
+
+export interface DraftInvoiceInput {
+  customer_id: number | null;
+  invoice_date: string;
+  due_date: string | null;
+  notes: string | null;
+  terms: string | null;
+  is_interstate: boolean;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+  line_items: LineItemInput[];
+}
+
+export interface InvoiceFilter {
+  status: InvoiceStatus | null;
+}
+
 /** application-architecture.md §6 — the shape every command error rejects with. */
 export interface ApplicationErrorPayload {
   kind: "not_found" | "validation" | "conflict" | "infrastructure";

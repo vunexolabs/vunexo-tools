@@ -7,10 +7,16 @@ import type {
   CustomerFields,
   CustomerFilter,
   CustomerListItem,
+  DraftInvoiceInput,
+  InvoiceFilter,
+  InvoiceSummary,
+  InvoiceWithLineItems,
   Product,
   ProductFields,
   ProductFilter,
   ProductListItem,
+  Settings,
+  SettingsFields,
 } from "./types";
 
 /** Round 1 technical spike: proves the React -> Tauri -> Rust round trip. */
@@ -84,4 +90,48 @@ export function getProduct(id: number): Promise<Product> {
 
 export function listProducts(filter: ProductFilter): Promise<ProductListItem[]> {
   return callCommand<ProductListItem[]>("list_products", { filter });
+}
+
+export function getSettings(): Promise<Settings> {
+  return callCommand<Settings>("get_settings");
+}
+
+export function updateSettings(fields: SettingsFields): Promise<Settings> {
+  return callCommand<Settings>("update_settings", { fields });
+}
+
+export function previewNextInvoiceNumber(): Promise<string> {
+  return callCommand<string>("preview_next_invoice_number");
+}
+
+export function createDraftInvoice(input: DraftInvoiceInput): Promise<InvoiceWithLineItems> {
+  return callCommand<InvoiceWithLineItems>("create_draft_invoice", { input });
+}
+
+export function updateDraftInvoice(id: number, input: DraftInvoiceInput): Promise<InvoiceWithLineItems> {
+  return callCommand<InvoiceWithLineItems>("update_draft_invoice", { id, input });
+}
+
+export function issueInvoice(id: number, customNumber: string | null): Promise<InvoiceWithLineItems> {
+  return callCommand<InvoiceWithLineItems>("issue_invoice", { id, customNumber });
+}
+
+export function cancelInvoice(id: number, reason: string | null): Promise<void> {
+  return callCommand<void>("cancel_invoice", { id, reason });
+}
+
+export function deleteDraftInvoice(id: number): Promise<void> {
+  return callCommand<void>("delete_draft_invoice", { id });
+}
+
+export function duplicateInvoice(id: number): Promise<InvoiceWithLineItems> {
+  return callCommand<InvoiceWithLineItems>("duplicate_invoice", { id });
+}
+
+export function getInvoice(id: number): Promise<InvoiceWithLineItems> {
+  return callCommand<InvoiceWithLineItems>("get_invoice", { id });
+}
+
+export function listInvoices(filter: InvoiceFilter): Promise<InvoiceSummary[]> {
+  return callCommand<InvoiceSummary[]>("list_invoices", { filter });
 }

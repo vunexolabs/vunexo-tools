@@ -6,11 +6,17 @@ use tauri::State;
 
 use crate::application::business::BusinessUseCases;
 use crate::application::customers::CustomerUseCases;
+use crate::application::invoices::InvoiceUseCases;
 use crate::application::products::ProductUseCases;
+use crate::application::settings::SettingsUseCases;
 use crate::application::ApplicationError;
 use crate::domain::business::Business;
 use crate::domain::customer::{Customer, CustomerFields, CustomerFilter, CustomerListItem};
+use crate::domain::invoice::{
+    DraftInvoiceInput, InvoiceFilter, InvoiceSummary, InvoiceWithLineItems,
+};
 use crate::domain::product::{Product, ProductFields, ProductFilter, ProductListItem};
+use crate::domain::settings::{Settings, SettingsFields};
 
 /// Round 1 technical spike: proves the React -> Tauri -> Rust round trip.
 #[tauri::command]
@@ -153,4 +159,93 @@ pub async fn list_products(
     filter: ProductFilter,
 ) -> Result<Vec<ProductListItem>, ApplicationError> {
     product_use_cases.list_products(filter).await
+}
+
+#[tauri::command]
+pub async fn get_settings(
+    settings_use_cases: State<'_, SettingsUseCases>,
+) -> Result<Settings, ApplicationError> {
+    settings_use_cases.get_settings().await
+}
+
+#[tauri::command]
+pub async fn update_settings(
+    settings_use_cases: State<'_, SettingsUseCases>,
+    fields: SettingsFields,
+) -> Result<Settings, ApplicationError> {
+    settings_use_cases.update_settings(fields).await
+}
+
+#[tauri::command]
+pub async fn preview_next_invoice_number(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+) -> Result<String, ApplicationError> {
+    invoice_use_cases.preview_next_invoice_number().await
+}
+
+#[tauri::command]
+pub async fn create_draft_invoice(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+    input: DraftInvoiceInput,
+) -> Result<InvoiceWithLineItems, ApplicationError> {
+    invoice_use_cases.create_draft_invoice(input).await
+}
+
+#[tauri::command]
+pub async fn update_draft_invoice(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+    id: i64,
+    input: DraftInvoiceInput,
+) -> Result<InvoiceWithLineItems, ApplicationError> {
+    invoice_use_cases.update_draft_invoice(id, input).await
+}
+
+#[tauri::command]
+pub async fn issue_invoice(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+    id: i64,
+    custom_number: Option<String>,
+) -> Result<InvoiceWithLineItems, ApplicationError> {
+    invoice_use_cases.issue_invoice(id, custom_number).await
+}
+
+#[tauri::command]
+pub async fn cancel_invoice(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+    id: i64,
+    reason: Option<String>,
+) -> Result<(), ApplicationError> {
+    invoice_use_cases.cancel_invoice(id, reason).await
+}
+
+#[tauri::command]
+pub async fn delete_draft_invoice(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+    id: i64,
+) -> Result<(), ApplicationError> {
+    invoice_use_cases.delete_draft_invoice(id).await
+}
+
+#[tauri::command]
+pub async fn duplicate_invoice(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+    id: i64,
+) -> Result<InvoiceWithLineItems, ApplicationError> {
+    invoice_use_cases.duplicate_invoice(id).await
+}
+
+#[tauri::command]
+pub async fn get_invoice(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+    id: i64,
+) -> Result<InvoiceWithLineItems, ApplicationError> {
+    invoice_use_cases.get_invoice(id).await
+}
+
+#[tauri::command]
+pub async fn list_invoices(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+    filter: InvoiceFilter,
+) -> Result<Vec<InvoiceSummary>, ApplicationError> {
+    invoice_use_cases.list_invoices(filter).await
 }

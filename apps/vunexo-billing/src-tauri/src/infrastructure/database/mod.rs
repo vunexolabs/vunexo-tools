@@ -4,7 +4,10 @@
 
 pub mod sqlite_business_repository;
 pub mod sqlite_customer_repository;
+pub mod sqlite_invoice_number_sequencer;
+pub mod sqlite_invoice_repository;
 pub mod sqlite_product_repository;
+pub mod sqlite_settings_repository;
 pub mod transaction;
 
 use std::path::Path;
@@ -23,5 +26,17 @@ pub async fn init_pool(db_path: &Path) -> anyhow::Result<SqlitePool> {
 /// Runs pending migrations embedded from `src-tauri/migrations/`.
 pub async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
     sqlx::migrate!().run(pool).await?;
+    Ok(())
+}
+
+/// Seeds the `settings` singleton row if it doesn't exist yet — its schema
+/// `DEFAULT`s (database-schema.md §13) become the actual values on first
+/// run. `business` is deliberately NOT seeded here: its absence is the
+/// first-run signal (user-flows.md §1), unlike `settings`, which always has
+/// a guaranteed row (application-architecture.md §3b).
+pub async fn seed_defaults(pool: &SqlitePool) -> anyhow::Result<()> {
+    sqlx::query("INSERT INTO settings (id) VALUES (1) ON CONFLICT(id) DO NOTHING")
+        .execute(pool)
+        .await?;
     Ok(())
 }
