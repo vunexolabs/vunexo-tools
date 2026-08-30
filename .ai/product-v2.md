@@ -53,7 +53,7 @@ V2 is complete only when, in addition to everything V1's DoD already requires:
 
 1. V2 scope research + lock (this document, `.ai/product-v2-scope.md`) — **done**
 2. User flows: Quote lifecycle, Quote→Invoice conversion, customer statement, reports, payment reminder — **done** (`docs/vunexo-billing/user-flows-v2.md`)
-3. Database schema deltas (Quotes table + numbering series, tax-regime configuration). **Statements and reports are read models, not domain entities** — the working assumption is SQL queries over `Customers`/`Invoices`/line items/`Payments`, the same pattern `DashboardRepository` already uses, not new `Statement`/`Report` tables. Only add persisted tables for these if Round 3 finds a genuine reason the query-time approach doesn't hold.
+3. Database schema deltas — **done** (`docs/vunexo-billing/database-schema-v2.md`): Quotes/QuoteLineItems/QuoteNumberCounters tables, `tax_regime_snapshot` added to invoices, `business.tax_regime_code`. Statements and reports confirmed as read models (SQL over existing tables), no new tables.
 4. Application architecture deltas (new IPC commands/repositories, tax-regime abstraction boundary)
 5. UI/UX structure for the new screens/actions
 6. Calculation engine changes — this is the one round that touches the money-math core (generalizing tax beyond the GST-specific `is_interstate`/CGST-SGST-IGST split in `calculation-engine.md` §5); everything else in V2 is additive on top of the existing engine
