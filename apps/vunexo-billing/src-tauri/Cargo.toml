@@ -1,6 +1,6 @@
 [package]
 name = "vunexo-billing"
-version = "0.0.0"
+version = "1.0.0"
 description = "Vunexo Billing — free, offline-first invoicing for small businesses"
 license = "MIT"
 edition = "2021"
