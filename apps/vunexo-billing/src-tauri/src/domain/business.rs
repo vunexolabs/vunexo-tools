@@ -41,10 +41,27 @@ pub fn managed_logo_path(extension: &str) -> String {
     format!("{MANAGED_LOGO_DIRECTORY}/business-logo.{extension}")
 }
 
+/// Whether `stored` looks like an absolute path under *any* desktop OS's
+/// convention (Unix `/...`, Windows drive `C:\...`/`C:/...`, or a UNC
+/// `\\server\...`) — deliberately not `Path::is_absolute()`, which means
+/// "absolute for the OS this binary happens to be compiled for". A `.vbx`
+/// backup can be restored onto a different machine *and a different OS*
+/// (database-schema.md §9's whole reason for existing); a legacy Unix path
+/// restored onto Windows would fail `Path::is_absolute()` there and get
+/// misjudged as a *managed*, relative one — silently joined onto the data
+/// directory instead of opened as-is. Found via CI's Windows runner: two
+/// tests using a Unix-style legacy path failed only on that target.
+fn looks_absolute(stored: &str) -> bool {
+    let bytes = stored.as_bytes();
+    stored.starts_with('/')
+        || stored.starts_with('\\')
+        || (bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':')
+}
+
 /// Whether `stored` is an app-managed logo — i.e. one that lives in the data
 /// directory and therefore travels inside a backup.
 pub fn is_managed_logo_path(stored: &str) -> bool {
-    !Path::new(stored).is_absolute()
+    !looks_absolute(stored)
 }
 
 /// Turns whatever is in `business.logo_path` into a path that can actually be
@@ -55,11 +72,10 @@ pub fn is_managed_logo_path(stored: &str) -> bool {
 /// stored wherever the user's file happened to be — and they still work on
 /// the machine that chose them, so they are honoured rather than broken.
 pub fn resolve_logo_path(stored: &str, data_directory: &Path) -> PathBuf {
-    let path = Path::new(stored);
-    if path.is_absolute() {
-        return path.to_path_buf();
+    if looks_absolute(stored) {
+        return PathBuf::from(stored);
     }
-    data_directory.join(path)
+    data_directory.join(stored)
 }
 
 #[cfg(test)]
@@ -97,5 +113,31 @@ mod tests {
             resolve_logo_path(legacy, Path::new("/data")),
             PathBuf::from(legacy)
         );
+    }
+
+    /// A legacy absolute path is recognised by its *shape*, not by
+    /// `Path::is_absolute()` against whatever OS this test happens to run
+    /// on: a `.vbx` restored onto a different machine can mean a different
+    /// OS too. CI's Windows runner caught the regression this guards
+    /// (`Path::new("/Users/...").is_absolute()` is `false` on Windows, and
+    /// `Path::new("C:\\...").is_absolute()` is `false` on Unix) — both must
+    /// be treated as absolute regardless of which OS is asking.
+    #[test]
+    fn a_legacy_path_is_recognised_as_absolute_regardless_of_which_os_wrote_it() {
+        for legacy in [
+            "/Users/someone/Documents/logo.png",    // Unix
+            r"C:\Users\someone\Documents\logo.png", // Windows drive letter
+            "C:/Users/someone/Documents/logo.png",  // Windows, forward slashes
+            r"\\server\share\logo.png",             // Windows UNC
+        ] {
+            assert!(
+                !is_managed_logo_path(legacy),
+                "expected {legacy:?} to be absolute"
+            );
+            assert_eq!(
+                resolve_logo_path(legacy, Path::new("/data")),
+                PathBuf::from(legacy)
+            );
+        }
     }
 }

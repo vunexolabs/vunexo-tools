@@ -36,7 +36,7 @@ Last commit is `147ac93`. Run `git status` before assuming the tree is clean.
 | Currency/country | — (pure display config) | ✅ `lib/currency.ts` (60 countries), `hooks/useCurrency.tsx` (app-wide context), every screen money-format-aware | — |
 | Release readiness (license/CI/docs) | ✅ `LICENSE` (MIT), `ADR-002` dependency audit, `THIRD_PARTY_NOTICES.md`, `.github/workflows/ci.yml`, app `README.md` | n/a | CI workflow untested — no push to a remote has triggered it yet |
 
-Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — see below). Frontend: `pnpm typecheck`/`lint`/`build` all clean.
+Backend: 116 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — see below). Frontend: `pnpm typecheck`/`lint`/`build` all clean.
 
 ### Pre-existing harmless warnings (don't "fix" without a reason)
 
@@ -53,6 +53,7 @@ Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 - The embedded DejaVu Sans has no glyph for BDT's `৳` or SAR's `﷼`; those fall back to the ISO code by design (`Fonts::can_render`). Don't "fix" it without swapping the font.
 - **An issued invoice prints its frozen business snapshot**, so changing the logo (or address, or bank details) in Settings does *not* change invoices already issued — by design (`.ai/product.md`'s locked snapshot principle). Editing one and saving re-snapshots it. This looks like a bug when reported ("my logo isn't showing"); check `business_snapshot_logo_path` on the actual invoice before hunting in the renderer.
 - macOS screenshot filenames contain U+202F (narrow no-break space) before `AM`/`PM`. Retyping such a path with an ordinary space silently finds nothing — copy it, don't retype it.
+- **Never use `Path::is_absolute()` on a `business.logo_path` string.** It means "absolute for the OS this binary is compiled for" — a legacy Unix path is not `is_absolute()` on Windows, and a Windows drive path is not `is_absolute()` on Unix. `domain::business::looks_absolute` is the portable, OS-independent check both `is_managed_logo_path`/`resolve_logo_path` use instead; CI's Windows runner caught this the first time it ran (see session 9).
 
 ## Known gaps (deliberate, not oversights)
 
@@ -68,8 +69,8 @@ Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 2. ~~Backup/restore + export~~ — done 2026-08-30 (session 3).
 3. ~~Make `business.logo_path` app-managed~~ — done 2026-08-30 (session 4).
 4. ~~PDF generation audit against real data~~ — done 2026-08-30 (session 5), passed. ~~Restore audit against real data~~ — done 2026-08-30 (session 6), passed. Only `app.restart()` itself (the OS-level relaunch) remains unconfirmed — that needs a human click-through in the running app, see the note in "Known gaps" below.
-5. ~~Fix the two actionable known gaps~~ — done 2026-08-30 (session 7): line-level discount UI, Dashboard Overdue-card click-through. The other two "known gaps" (multi-country tax, the PDF's neutral non-India tax line) are locked out-of-scope, not bugs — left as-is on purpose. **Not yet clicked through in the running app** — `typecheck`/`lint`/`build` pass, but nobody has looked at the actual rendered UI yet.
-6. ~~Release readiness: license, CI, docs~~ — done 2026-08-30 (session 8): `LICENSE` (MIT) + dependency audit (`ADR-002`), `THIRD_PARTY_NOTICES.md`, `.github/workflows/ci.yml` (Ubuntu/Windows/macOS matrix), `apps/vunexo-billing/README.md`. **Still open**: the CI workflow has never actually run (needs a push/PR to a GitHub remote to fire), and nobody has built/run the app on a real Windows or Linux machine — only ever exercised on the developer's macOS box. Both are things only the user (or a real CI run) can confirm.
+5. ~~Fix the two actionable known gaps~~ — done 2026-08-30 (session 7): line-level discount UI, Dashboard Overdue-card click-through. The other two "known gaps" (multi-country tax, the PDF's neutral non-India tax line) are locked out-of-scope, not bugs — left as-is on purpose. **User manually confirmed both in the running app (session 9)** — line-discount UI and the Overdue-card click-through both work.
+6. ~~Release readiness: license, CI, docs~~ — done 2026-08-30 (session 8), pushed 2026-08-30 (session 9). **First CI run caught a real cross-OS bug** (`domain::business::is_managed_logo_path` used `Path::is_absolute()`, which is platform-dependent — a legacy Unix logo path restored onto Windows was misjudged as a *managed* relative one). Fixed to a portable string check + a regression test covering Unix/Windows-drive/UNC forms; also fixed the CI workflow itself (`node-version: 20` → `22`, pnpm 11.7 requires ≥22.13). Re-pushed; see the top of this file for the second run's result. Still open regardless of outcome: nobody has built/run the app on a real Windows or Linux machine — CI passing proves it compiles and tests pass cross-platform, not that a person has used it there.
 
 ## Verification commands (all of these, every slice)
 
