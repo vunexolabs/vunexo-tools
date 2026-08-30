@@ -25,7 +25,7 @@ Last updated: 2026-08-30.
 
 Backend: Rust/Tauri/SQLx, `apps/vunexo-billing/src-tauri/`. Frontend: React/TS/Tailwind, `apps/vunexo-billing/src/`. Version is `1.0.0` in `package.json`/`tauri.conf.json`/`Cargo.toml`.
 
-Last commit is `221e26e`. Run `git status` before assuming the tree is clean.
+Last commit is `1dedf6b`. Run `git status` before assuming the tree is clean.
 
 | Slice | Backend | Frontend | Tests |
 |---|---|---|---|
@@ -43,9 +43,10 @@ Last commit is `221e26e`. Run `git status` before assuming the tree is clean.
 | UX audit fixes | — | ✅ `ConfirmDialog`, `SearchablePicker` + quick-add modals, live-updating totals, "Overdue" filter | — |
 | Currency/country | — (pure display config) | ✅ `lib/currency.ts` (60 countries), `hooks/useCurrency.tsx` (app-wide context), every screen money-format-aware | — |
 | Release readiness (license/CI/docs) | ✅ `LICENSE` (MIT), `ADR-002` dependency audit, `THIRD_PARTY_NOTICES.md`, `.github/workflows/ci.yml`, app `README.md` | n/a | CI workflow untested — no push to a remote has triggered it yet |
-| **V2 — Quote lifecycle + tax regime (Round 7, session 12)** | ✅ full lifecycle incl. `convert_quote_to_invoice`'s atomic 2-table transaction; `business.tax_regime_code`, `VAT_STANDARD` presentation (`present_vat`); **wired into `main.rs`, 11 `commands::*_quote` Tauri commands live**; `quote_number_format` read-only-after-first-issue lock enforced | ❌ not started | 12 new integration/unit tests, real SQLite |
+| **V2 — Quote lifecycle + tax regime (Round 7, session 12)** | ✅ full lifecycle incl. `convert_quote_to_invoice`'s atomic 2-table transaction; `business.tax_regime_code`, `VAT_STANDARD` presentation (`present_vat`); wired into `main.rs`, 11 `commands::*_quote` Tauri commands live; `quote_number_format` read-only-after-first-issue lock enforced | ✅ Quotes List + Editor (mirrors Invoice Editor, editable in Draft only per the locked design), Quotes nav section, converting hands off into the Invoices section | 12 backend integration/unit tests; frontend verified via `typecheck`/`lint`/`build` only — **not manually clicked through the running app** |
+| **V2 — Statements, reports, reminders (Round 7 slice 7C, session 12)** | ✅ `StatementRepository`/`ReportRepository` (SQL-aggregated, same discipline as `DashboardRepository`), `GenerateCustomerStatement`/`GenerateSalesReport`/`GenerateTaxSummaryReport`/`GenerateReminderMessage`; wired, 4 Tauri commands live | ❌ not started | 6 integration tests incl. the opening/closing-balance reconciliation property across 3 real periods |
 
-Backend: 128 tests passing (was 116 pre-V2), `cargo fmt`/`clippy` clean modulo the warnings below. Frontend: `pnpm typecheck`/`lint`/`build` all clean (frontend untouched by V2 work so far).
+Backend: 134 tests passing (was 116 pre-V2), `cargo fmt`/`clippy` clean modulo the warnings below. Frontend: `pnpm typecheck`/`lint`/`build` all clean.
 
 ### Pre-existing harmless warnings (don't "fix" without a reason)
 
@@ -92,9 +93,9 @@ Backend: 128 tests passing (was 116 pre-V2), `cargo fmt`/`clippy` clean modulo t
 
 - **Confirm Windows/Linux installers on real hardware** — the one remaining V1 DoD item. Not urgent (doesn't block using the app), but V1 isn't *fully* closed out until this happens.
 - **V2 design (Rounds 1–6) fully locked** (session 12) — `.ai/product-v2.md` + the six `docs/vunexo-billing/*-v2.md` documents. See the 2026-08-30 daily file for the full history if needed; not repeated here since design is done and this file tracks current state, not history.
-- **V2 Round 7 (implementation) in progress, session 12 — backend Quote lifecycle done AND wired.** Real, tested, reachable code: `domain::quote`/`quote_line_item`/`tax_regime`, `application::quotes::QuoteUseCases` (full lifecycle incl. `convert_quote_to_invoice`), `SqliteQuoteRepository`/`SqliteQuoteNumberSequencer`, `business.tax_regime_code`, `present_vat`, all registered in `main.rs`, 11 `commands::*_quote` Tauri commands live, `quote_number_format`'s read-only-after-first-issue lock enforced. 128 tests passing, `fmt`/`clippy` clean (3 warnings, all expected — see above). **Next, in order**:
-  1. **Round 7 slice 7C**: statements + reports + reminders (application-architecture-v2.md's remaining use cases — `StatementRepository`/`ReportRepository`, `GenerateCustomerStatement`, `GenerateSalesReport`, `GenerateTaxSummaryReport`, `GenerateReminderMessage`).
-  2. **All frontend/UI** (7E–7G in the user's slicing plan): Quote Editor, Customer Statement tab, Reports screens, Payment Reminder modal — nothing started, `apps/vunexo-billing/src/` is untouched by V2 so far. The backend commands exist and are callable now, so this is unblocked whenever it's picked up.
+- **V2 Round 7 backend is entirely done, session 12** — Quote lifecycle (incl. `convert_quote_to_invoice`) and statements/reports/reminders (7C), all real, tested, and wired into `main.rs`/Tauri. 15 `commands::*` functions total across the two slices. 134 tests passing, `fmt`/`clippy` clean (3 warnings, all expected: `present_vat` has no caller yet since nothing renders a `VAT_STANDARD` PDF/report).
+- **V2 frontend, session 12 — Quotes done, Statements/Reports/Reminder UI not started.** `features/quotes/{QuotesList,QuoteEditor}.tsx`, `hooks/useQuotes.ts`, full type/command bridge (`lib/tauri/types.ts`/`commands.ts`), `QuoteStatusBadge`, Quotes as a new nav section in `App.tsx`. `typecheck`/`lint`/`build` all clean — **not manually clicked through the running app** (no browser/UI-automation tool available in this session; verified via the type pipeline and the backend integration tests the screens call). **One known, disclosed gap**: a Converted quote shows a plain note instead of a working link to the invoice it produced — no backend reverse-lookup (`quote → its invoice`) was built, since nothing in the locked design asked for one beyond display.
+- **Next**: Statement tab (Customer Detail), Reports screens (Sales Summary + Tax Summary), Payment Reminder modal — the backend commands for all three already exist and are callable, this is pure frontend work. A human should also click through the new Quotes screens in the real running app at least once before calling this slice done.
 
 ## Verification commands (all of these, every slice)
 
