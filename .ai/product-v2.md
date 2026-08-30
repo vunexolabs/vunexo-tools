@@ -18,10 +18,10 @@ V1 was "simple, free, offline-first invoicing." V2 is **a complete, flexible bil
 
 ## In scope — V2
 
-- **Multi-country tax architecture (foundation)**: generalize the tax engine beyond India-only GST so a business can be configured for a non-GST tax regime, without making Vunexo Billing an accounting or tax-filing product. This is architectural — it underpins every other V2 item that touches tax, but ships as infrastructure, not a standalone user-facing feature.
-- **Quotes/Estimates → Invoice**: create/edit a Quote (reuses the existing line-item/discount/tax/snapshot architecture), issue it, and convert an accepted Quote into a Draft Invoice.
-- **Customer statements**: a printable/exportable running-balance view per customer, reusing data already tracked (`Customers` dashboard, invoice/payment history).
-- **Sales & tax summary reports**: SQL-aggregated reports (sales by period/product/customer, a GST/tax summary) exported via the existing CSV/JSON pipeline. A report to hand an accountant — not filing, not a compliance product.
+- **Multi-country tax architecture (foundation)**: generalize the tax engine beyond India-only GST so a business can be configured for a non-GST tax regime, without making Vunexo Billing an accounting or tax-filing product. This is architectural — it underpins every other V2 item that touches tax, but ships as infrastructure, not a standalone user-facing feature. **Hard boundary**: the architecture must be *capable of* supporting multiple regimes (a `Tax Regime` concept — country, regime, tax labels, rates, calculation rules, document presentation — configured data, not branching code), but V2 itself deliberately implements a small, named set of regimes, not "every country's tax system." Round 4/6 must reject any design that reads as `if india: gst_logic else: generic_tax` — that's not architecture, it's a special case with a fallback.
+- **Quotes/Estimates → Invoice**: create/edit a Quote (reuses the existing line-item/discount/tax/snapshot architecture), issue it, and convert an accepted Quote into a Draft Invoice. **Round 2 must settle**, not leave implicit: the full status lifecycle (draft/issued/accepted/converted, plus cancelled/expired — and whether "accepted" is a real state or just the action that triggers conversion), whether issued/accepted quotes are editable, whether a converted or cancelled quote can still be converted again, whether one quote can produce more than one invoice, and — consistent with V1's snapshot principle — that a converted invoice's line items are an independent snapshot, unaffected by any later edit to the source quote.
+- **Customer statements**: a printable/exportable running-balance view per customer, reusing data already tracked (`Customers` dashboard, invoice/payment history). Deliberately simple: `opening balance + invoices − payments = running balance`, with dates and document references. No journal entries, no reconciliation engine, no accounting ledger — the moment a statement needs either of those, it's stopped being a billing feature.
+- **Sales & tax summary reports**: SQL-aggregated reports (sales by period/product/customer, a GST/tax summary) exported via the existing CSV/JSON pipeline. A report to hand an accountant — not filing, not a compliance product. Governance rule: a V2 report answers "what happened," never "what should I file with the government" — the day a report needs government-specific filing formats, it's out of scope again.
 - **Payment reminders / follow-up**: overdue detection already exists (V1 dashboard); V2 adds a "generate reminder" action producing a copyable/printable/shareable reminder message. No WhatsApp API integration, no email sending infrastructure — local generation only, matching the no-cloud-dependency principle.
 - **UPI QR on invoice PDF**: small enhancement, not a scope driver. `business.upi_id` already exists as a stored field; render it as a static UPI deep-link QR on the PDF. Purely offline (encodes a link, doesn't process anything) — doesn't touch the "no payment gateway integration" lock.
 
@@ -42,7 +42,7 @@ All of `product.md`'s frozen principles still apply: invoice snapshotting, no bi
 
 V2 is complete only when, in addition to everything V1's DoD already requires:
 
-- A business can be configured for a tax regime other than India GST, and invoices/quotes calculate and display correctly under it.
+- A business can be configured for India GST **or at least one supported non-India tax regime**, and invoices/quotes calculate and display correctly under whichever regime is selected. (Explicitly not "any country's tax system" — this DoD line is satisfied by one additional regime done correctly, not broad coverage.)
 - A user can create a Quote, issue it, and convert it into an Invoice without re-entering line items.
 - A user can generate and export a customer statement.
 - A user can generate a sales/tax summary report and export it.
@@ -53,7 +53,7 @@ V2 is complete only when, in addition to everything V1's DoD already requires:
 
 1. V2 scope research + lock (this document, `.ai/product-v2-scope.md`) — **done**
 2. User flows: Quote lifecycle, Quote→Invoice conversion, customer statement, reports, payment reminder
-3. Database schema deltas (Quotes table + numbering series, tax-regime configuration, whatever a statement/report view needs)
+3. Database schema deltas (Quotes table + numbering series, tax-regime configuration). **Statements and reports are read models, not domain entities** — the working assumption is SQL queries over `Customers`/`Invoices`/line items/`Payments`, the same pattern `DashboardRepository` already uses, not new `Statement`/`Report` tables. Only add persisted tables for these if Round 3 finds a genuine reason the query-time approach doesn't hold.
 4. Application architecture deltas (new IPC commands/repositories, tax-regime abstraction boundary)
 5. UI/UX structure for the new screens/actions
 6. Calculation engine changes — this is the one round that touches the money-math core (generalizing tax beyond the GST-specific `is_interstate`/CGST-SGST-IGST split in `calculation-engine.md` §5); everything else in V2 is additive on top of the existing engine
