@@ -10,6 +10,7 @@ use crate::application::business::BusinessUseCases;
 use crate::application::customers::CustomerUseCases;
 use crate::application::dashboard::DashboardUseCases;
 use crate::application::export::ExportUseCases;
+use crate::application::file_export::FileExportUseCases;
 use crate::application::invoices::InvoiceUseCases;
 use crate::application::payments::PaymentUseCases;
 use crate::application::pdf::PdfUseCases;
@@ -590,5 +591,20 @@ pub async fn generate_reminder_message(
 ) -> Result<String, ApplicationError> {
     reminder_use_cases
         .generate_reminder_message(invoice_id)
+        .await
+}
+
+/// Writes CSV/JSON built client-side (Statement/Report screens — see
+/// `file_export.rs`'s module note) to a path already chosen in the OS save
+/// dialog. Not entity-typed like `export_data`: the content is already text
+/// by the time it gets here.
+#[tauri::command]
+pub async fn write_export_file(
+    file_export_use_cases: State<'_, FileExportUseCases>,
+    path: String,
+    contents: String,
+) -> Result<(), ApplicationError> {
+    file_export_use_cases
+        .write_text_file(std::path::Path::new(&path), &contents)
         .await
 }

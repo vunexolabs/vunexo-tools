@@ -326,3 +326,8 @@ export function generateTaxSummaryReport(rangeStart: string, rangeEnd: string): 
 export function generateReminderMessage(invoiceId: number): Promise<string> {
   return callCommand<string>("generate_reminder_message", { invoiceId });
 }
+
+/** Writes CSV/JSON built client-side (Statement/Reports exports) to a path already chosen in the OS save dialog. */
+export function writeExportFile(path: string, contents: string): Promise<void> {
+  return callCommand<void>("write_export_file", { path, contents });
+}

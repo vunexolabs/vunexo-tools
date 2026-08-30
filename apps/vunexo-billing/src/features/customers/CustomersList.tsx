@@ -11,7 +11,7 @@ import { CustomerForm } from "./CustomerForm";
  * archive/restore/delete are decided from data already in hand, never by
  * attempting a delete and catching the resulting Conflict.
  */
-export function CustomersList() {
+export function CustomersList({ onOpen }: { onOpen: (id: number) => void }) {
   const [includeArchived, setIncludeArchived] = useState(false);
   const { customers, error, create, update, archive, restore, remove } = useCustomers(includeArchived);
   const [editing, setEditing] = useState<Customer | "new" | null>(null);
@@ -81,6 +81,9 @@ export function CustomersList() {
               </td>
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-2">
+                  <button onClick={() => onOpen(c.id)} className="text-sky-400 hover:underline">
+                    Statement
+                  </button>
                   <button onClick={() => setEditing(c)} className="text-sky-400 hover:underline">
                     Edit
                   </button>

@@ -14,6 +14,7 @@ use application::business::BusinessUseCases;
 use application::customers::CustomerUseCases;
 use application::dashboard::DashboardUseCases;
 use application::export::ExportUseCases;
+use application::file_export::FileExportUseCases;
 use application::invoices::InvoiceUseCases;
 use application::payments::PaymentUseCases;
 use application::pdf::PdfUseCases;
@@ -182,6 +183,7 @@ fn main() {
                 customer_repo.clone(),
             ));
             app.manage(ReportUseCases::new(report_repo));
+            app.manage(FileExportUseCases::new(file_writer.clone()));
             app.manage(ReminderUseCases::new(
                 invoice_repo.clone(),
                 payment_repo.clone(),
@@ -263,6 +265,7 @@ fn main() {
             commands::generate_sales_report,
             commands::generate_tax_summary_report,
             commands::generate_reminder_message,
+            commands::write_export_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running vunexo-billing");

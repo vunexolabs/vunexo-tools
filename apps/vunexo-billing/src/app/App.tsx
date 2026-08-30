@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BusinessSetup } from "../features/settings/BusinessSetup";
+import { CustomerDetail } from "../features/customers/CustomerDetail";
 import { CustomersList } from "../features/customers/CustomersList";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { InvoiceEditor } from "../features/invoices/InvoiceEditor";
@@ -7,14 +8,12 @@ import { InvoicesList, type FilterOption } from "../features/invoices/InvoicesLi
 import { ProductsList } from "../features/products/ProductsList";
 import { QuoteEditor } from "../features/quotes/QuoteEditor";
 import { QuotesList } from "../features/quotes/QuotesList";
+import { ReportsScreen } from "../features/reports/ReportsScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { useBusiness } from "../hooks/useBusiness";
 
-// ui-ux-v2.md §2 — Quotes is a new top-level section; Reports is also
-// locked as one, but its screens aren't built yet (Round 7 slice not
-// started), so it isn't added to this list until there's something behind
-// it to navigate to.
-type Section = "dashboard" | "invoices" | "quotes" | "customers" | "products" | "settings";
+// ui-ux-v2.md §2 — Quotes and Reports are new top-level sections.
+type Section = "dashboard" | "invoices" | "quotes" | "customers" | "products" | "reports" | "settings";
 
 const SECTIONS: { id: Section; label: string; implemented: boolean }[] = [
   { id: "dashboard", label: "Dashboard", implemented: true },
@@ -22,6 +21,7 @@ const SECTIONS: { id: Section; label: string; implemented: boolean }[] = [
   { id: "quotes", label: "Quotes", implemented: true },
   { id: "customers", label: "Customers", implemented: true },
   { id: "products", label: "Products", implemented: true },
+  { id: "reports", label: "Reports", implemented: true },
   { id: "settings", label: "Settings", implemented: true },
 ];
 
@@ -36,6 +36,7 @@ export function App() {
   const [openInvoiceId, setOpenInvoiceId] = useState<number | null>(null);
   const [invoiceFilter, setInvoiceFilter] = useState<FilterOption>(null);
   const [openQuoteId, setOpenQuoteId] = useState<number | null>(null);
+  const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
 
   if (business === undefined) {
     return (
@@ -54,6 +55,7 @@ export function App() {
     setOpenInvoiceId(null);
     setInvoiceFilter(null);
     setOpenQuoteId(null);
+    setOpenCustomerId(null);
   };
 
   return (
@@ -112,8 +114,14 @@ export function App() {
               }}
             />
           ))}
-        {section === "customers" && <CustomersList />}
+        {section === "customers" &&
+          (openCustomerId === null ? (
+            <CustomersList onOpen={setOpenCustomerId} />
+          ) : (
+            <CustomerDetail customerId={openCustomerId} onBack={() => setOpenCustomerId(null)} />
+          ))}
         {section === "products" && <ProductsList />}
+        {section === "reports" && <ReportsScreen />}
         {section === "settings" && <SettingsScreen />}
       </main>
     </div>

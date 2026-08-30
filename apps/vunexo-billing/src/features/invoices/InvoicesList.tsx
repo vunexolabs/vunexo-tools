@@ -3,6 +3,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { StatusBadge } from "../../components/StatusBadge";
 import { PaymentPanel } from "../payments/PaymentPanel";
+import { ReminderModal } from "../reminders/ReminderModal";
 import { InvoicePdfPreview } from "./InvoicePdfPreview";
 import { createDraftInvoice } from "../../lib/tauri/commands";
 import { useCurrency } from "../../hooks/useCurrency";
@@ -55,6 +56,7 @@ export function InvoicesList({
   // the list, not only from inside the editor.
   const [pdfInvoice, setPdfInvoice] = useState<{ id: number; number: string | null } | null>(null);
   const pdf = useInvoicePdf();
+  const [remindInvoice, setRemindInvoice] = useState<{ id: number; number: string | null } | null>(null);
 
   const runRowAction = async (action: () => Promise<void>) => {
     setRowError(null);
@@ -168,6 +170,14 @@ export function InvoicesList({
                         Cancel
                       </button>
                     )}
+                    {inv.is_overdue && (
+                      <button
+                        onClick={() => setRemindInvoice({ id: inv.id, number: inv.invoice_number })}
+                        className="text-red-400 hover:underline"
+                      >
+                        Remind
+                      </button>
+                    )}
                     {inv.status !== "DRAFT" && (
                       <button
                         onClick={() => {
@@ -223,6 +233,10 @@ export function InvoicesList({
             void pdf.saveAs(pdfInvoice.id, pdf.suggestedFileName(pdfInvoice.number, pdfInvoice.id))
           }
         />
+      )}
+
+      {remindInvoice && (
+        <ReminderModal invoiceId={remindInvoice.id} invoiceNumber={remindInvoice.number} onClose={() => setRemindInvoice(null)} />
       )}
 
       {invoices !== null && invoices.length === 0 && (

@@ -8,6 +8,7 @@ pub mod customers;
 pub mod dashboard;
 pub mod error;
 pub mod export;
+pub mod file_export;
 pub mod invoices;
 pub mod payments;
 pub mod pdf;

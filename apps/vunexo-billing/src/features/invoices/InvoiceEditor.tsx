@@ -7,6 +7,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { CustomerForm } from "../customers/CustomerForm";
 import { PaymentPanel } from "../payments/PaymentPanel";
 import { ProductForm } from "../products/ProductForm";
+import { ReminderModal } from "../reminders/ReminderModal";
 import { InvoicePdfPreview } from "./InvoicePdfPreview";
 import {
   cancelInvoice,
@@ -145,6 +146,7 @@ export function InvoiceEditor({
   const [duplicating, setDuplicating] = useState(false);
   const [savedPdfPath, setSavedPdfPath] = useState<string | null>(null);
   const pdf = useInvoicePdf();
+  const [showReminder, setShowReminder] = useState(false);
 
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [invoiceDate, setInvoiceDate] = useState("");
@@ -284,6 +286,12 @@ export function InvoiceEditor({
   const isDraft = invoice.status === "DRAFT";
   const isCancelled = invoice.status === "CANCELLED";
   const isEditable = !isCancelled;
+  // Same is_overdue predicate as database-schema.md §8 (status ISSUED/PARTIALLY_PAID,
+  // due_date passed) — a button-visibility check, not a recomputed financial figure.
+  const isOverdue =
+    (invoice.status === "ISSUED" || invoice.status === "PARTIALLY_PAID") &&
+    invoice.due_date !== null &&
+    invoice.due_date < new Date().toISOString().slice(0, 10);
 
   // ui-ux.md §3: a payment mutation changes the invoice's `status` as a side
   // effect the payment panel itself doesn't return inline — refetch here so
@@ -821,6 +829,11 @@ export function InvoiceEditor({
           <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50">
             {duplicating ? "Duplicating…" : "Duplicate"}
           </button>
+          {isOverdue && (
+            <button onClick={() => setShowReminder(true)} className="rounded border border-red-700 px-4 py-2 font-medium text-red-400">
+              Remind
+            </button>
+          )}
           <button
             onClick={() => {
               setCancelReason("");
@@ -870,6 +883,10 @@ export function InvoiceEditor({
           onClose={pdf.closePreview}
           onSave={() => void handleSavePdf()}
         />
+      )}
+
+      {showReminder && (
+        <ReminderModal invoiceId={invoice.id} invoiceNumber={invoice.invoice_number} onClose={() => setShowReminder(false)} />
       )}
 
       {showNewCustomerModal && (
