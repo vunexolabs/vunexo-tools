@@ -34,6 +34,7 @@ Last commit is `147ac93`. Run `git status` before assuming the tree is clean.
 | **Export (CSV + JSON)** | ✅ `export_data`, RFC 4180 CSV, every table as domain shapes in JSON | ✅ four buttons in Settings → Data | 4 integration + 9 unit |
 | UX audit fixes | — | ✅ `ConfirmDialog`, `SearchablePicker` + quick-add modals, live-updating totals, "Overdue" filter | — |
 | Currency/country | — (pure display config) | ✅ `lib/currency.ts` (60 countries), `hooks/useCurrency.tsx` (app-wide context), every screen money-format-aware | — |
+| Release readiness (license/CI/docs) | ✅ `LICENSE` (MIT), `ADR-002` dependency audit, `THIRD_PARTY_NOTICES.md`, `.github/workflows/ci.yml`, app `README.md` | n/a | CI workflow untested — no push to a remote has triggered it yet |
 
 Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — see below). Frontend: `pnpm typecheck`/`lint`/`build` all clean.
 
@@ -68,6 +69,7 @@ Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 3. ~~Make `business.logo_path` app-managed~~ — done 2026-08-30 (session 4).
 4. ~~PDF generation audit against real data~~ — done 2026-08-30 (session 5), passed. ~~Restore audit against real data~~ — done 2026-08-30 (session 6), passed. Only `app.restart()` itself (the OS-level relaunch) remains unconfirmed — that needs a human click-through in the running app, see the note in "Known gaps" below.
 5. ~~Fix the two actionable known gaps~~ — done 2026-08-30 (session 7): line-level discount UI, Dashboard Overdue-card click-through. The other two "known gaps" (multi-country tax, the PDF's neutral non-India tax line) are locked out-of-scope, not bugs — left as-is on purpose. **Not yet clicked through in the running app** — `typecheck`/`lint`/`build` pass, but nobody has looked at the actual rendered UI yet.
+6. ~~Release readiness: license, CI, docs~~ — done 2026-08-30 (session 8): `LICENSE` (MIT) + dependency audit (`ADR-002`), `THIRD_PARTY_NOTICES.md`, `.github/workflows/ci.yml` (Ubuntu/Windows/macOS matrix), `apps/vunexo-billing/README.md`. **Still open**: the CI workflow has never actually run (needs a push/PR to a GitHub remote to fire), and nobody has built/run the app on a real Windows or Linux machine — only ever exercised on the developer's macOS box. Both are things only the user (or a real CI run) can confirm.
 
 ## Verification commands (all of these, every slice)
 
@@ -85,4 +87,4 @@ The user's `pnpm tauri dev` session tends to stay running for an entire work ses
 
 - `2026-08-28.md` — Rounds 1–6 locked; Business/Customers/Products CRUD + calculation engine implemented.
 - `2026-08-29.md` — Invoices vertical slice (draft/issue/cancel/duplicate/list).
-- `2026-08-30.md` — seven sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects. Session 6: audited backup/restore against a real-data-shaped copy — passed, no defects. Session 7: fixed the two actionable known gaps (line-level discount UI, Dashboard Overdue click-through).
+- `2026-08-30.md` — eight sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects. Session 6: audited backup/restore against a real-data-shaped copy — passed, no defects. Session 7: fixed the two actionable known gaps (line-level discount UI, Dashboard Overdue click-through). Session 8: release readiness — license, CI, third-party notices, app README.

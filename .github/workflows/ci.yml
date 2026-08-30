@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  frontend:
+    name: Frontend (typecheck, lint, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter vunexo-billing typecheck
+
+      - name: Lint
+        run: pnpm --filter vunexo-billing lint
+
+      - name: Build
+        run: pnpm --filter vunexo-billing build
+
+  backend:
+    name: Backend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        working-directory: apps/vunexo-billing/src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies (Tauri v2)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/vunexo-billing/src-tauri
+
+      - name: Build
+        run: cargo build
+
+      - name: Test
+        run: cargo test --quiet
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy
+        # No -D warnings: one field (`ApplicationError::Infrastructure`) is an
+        # intentional, accepted dead-code warning — see CURRENT.md's
+        # "Pre-existing harmless warnings". Denying all warnings would fail
+        # CI on a warning the project deliberately keeps.
+        run: cargo clippy --all-targets --quiet
