@@ -15,7 +15,10 @@ use crate::application::payments::PaymentUseCases;
 use crate::application::pdf::PdfUseCases;
 use crate::application::products::ProductUseCases;
 use crate::application::quotes::QuoteUseCases;
+use crate::application::reminders::ReminderUseCases;
+use crate::application::reports::ReportUseCases;
 use crate::application::settings::SettingsUseCases;
+use crate::application::statements::StatementUseCases;
 use crate::application::tax_rates::TaxRateUseCases;
 use crate::application::ApplicationError;
 use crate::domain::backup::{backup_file_name, BackupMetadata};
@@ -30,7 +33,9 @@ use crate::domain::invoice_pdf::LogoProbe;
 use crate::domain::payment::{NewPayment, Payment, PaymentFields};
 use crate::domain::product::{Product, ProductFields, ProductFilter, ProductListItem};
 use crate::domain::quote::{DraftQuoteInput, QuoteFilter, QuoteSummary, QuoteWithLineItems};
+use crate::domain::report::{SalesGrouping, SalesSummaryResult, TaxSummaryResult};
 use crate::domain::settings::{Settings, SettingsFields};
+use crate::domain::statement::StatementResult;
 use crate::domain::tax_rate::{TaxRate, TaxRateFields};
 
 /// Round 1 technical spike: proves the React -> Tauri -> Rust round trip.
@@ -540,5 +545,50 @@ pub async fn export_data(
 ) -> Result<(), ApplicationError> {
     export_use_cases
         .export_to(entity, std::path::Path::new(&path))
+        .await
+}
+
+#[tauri::command]
+pub async fn generate_customer_statement(
+    statement_use_cases: State<'_, StatementUseCases>,
+    customer_id: i64,
+    range_start: chrono::NaiveDate,
+    range_end: chrono::NaiveDate,
+) -> Result<StatementResult, ApplicationError> {
+    statement_use_cases
+        .generate_customer_statement(customer_id, range_start, range_end)
+        .await
+}
+
+#[tauri::command]
+pub async fn generate_sales_report(
+    report_use_cases: State<'_, ReportUseCases>,
+    range_start: chrono::NaiveDate,
+    range_end: chrono::NaiveDate,
+    group_by: SalesGrouping,
+) -> Result<SalesSummaryResult, ApplicationError> {
+    report_use_cases
+        .generate_sales_report(range_start, range_end, group_by)
+        .await
+}
+
+#[tauri::command]
+pub async fn generate_tax_summary_report(
+    report_use_cases: State<'_, ReportUseCases>,
+    range_start: chrono::NaiveDate,
+    range_end: chrono::NaiveDate,
+) -> Result<TaxSummaryResult, ApplicationError> {
+    report_use_cases
+        .generate_tax_summary_report(range_start, range_end)
+        .await
+}
+
+#[tauri::command]
+pub async fn generate_reminder_message(
+    reminder_use_cases: State<'_, ReminderUseCases>,
+    invoice_id: i64,
+) -> Result<String, ApplicationError> {
+    reminder_use_cases
+        .generate_reminder_message(invoice_id)
         .await
 }

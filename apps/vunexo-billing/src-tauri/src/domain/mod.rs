@@ -18,6 +18,8 @@ pub mod payment;
 pub mod product;
 pub mod quote;
 pub mod quote_line_item;
+pub mod report;
 pub mod settings;
+pub mod statement;
 pub mod tax_rate;
 pub mod tax_regime;

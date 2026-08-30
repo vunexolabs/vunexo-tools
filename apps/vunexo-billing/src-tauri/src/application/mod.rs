@@ -14,7 +14,10 @@ pub mod pdf;
 pub mod ports;
 pub mod products;
 pub mod quotes;
+pub mod reminders;
+pub mod reports;
 pub mod settings;
+pub mod statements;
 pub mod tax_rates;
 
 pub use error::ApplicationError;
