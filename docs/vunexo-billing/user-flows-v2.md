@@ -35,23 +35,24 @@ DRAFT ──issue──▶ ISSUED ──accept──▶ ACCEPTED ──convert�
                     │
                     ├──decline──▶ DECLINED
                     │
-                    └──expire───▶ EXPIRED   (due_date passed, still ISSUED)
+                    └──expire───▶ EXPIRED   (valid_until passed, still ISSUED)
 
-DRAFT, ISSUED ──cancel──▶ CANCELLED
+DRAFT, ISSUED, ACCEPTED ──cancel──▶ CANCELLED
 ```
 
 Settled here, per the open questions `.ai/product-v2.md` flagged for this round:
 
 - **`ACCEPTED` is a real, stored state, not just an action.** A business needs to know "the customer said yes but I haven't billed it yet" as a distinct, visible state — that's real information (e.g. work can start), separate from "already invoiced."
 - **A Quote is editable in `DRAFT` only.** Once `ISSUED`, it is immutable content-wise (same rationale as an issued invoice needing deliberate re-snapshotting, but simpler here — a Quote has no payment history to protect, so V2 does not extend V1's "edit an issued document" allowance to Quotes: if the numbers were wrong, cancel and duplicate into a new Draft, mirroring how V1 already treats a `CANCELLED` invoice).
-- **`EXPIRED` is derived, not a stored transition the user triggers** — same pattern as V1's `OVERDUE` badge (`user-flows.md` §6): `is_expired = due_date < today AND status == ISSUED`. It's a display badge, not something reachable via a "mark expired" button.
+- **`EXPIRED` is derived, not a stored transition the user triggers** — same pattern as V1's `OVERDUE` badge (`user-flows.md` §6): `is_expired = valid_until < today AND status == ISSUED`. It's a display badge, not something reachable via a "mark expired" button.
 - **`CONVERTED` is terminal.** A Quote converts to an invoice **exactly once** — after conversion it cannot be converted again, edited, or reissued. This answers the "can one quote produce multiple invoices" question: no. (A business that genuinely wants to bill the same accepted work twice duplicates the *resulting invoice*, the normal V1 duplicate flow — not the quote.)
+- **`ACCEPTED` quotes may also be cancelled, not only `DRAFT`/`ISSUED`.** Explicit invariant, not left for Round 3 to infer: acceptance means the customer agreed to the price, not that the job is guaranteed to happen — a customer backing out after accepting is a real scenario, and a business needs to be able to record "this isn't proceeding" rather than being stuck with a quote permanently stranded in `ACCEPTED` with no legal next state. Cancelling an `ACCEPTED` quote requires the same optional reason field V1 already uses for cancelling an invoice.
 - **`CANCELLED` is terminal**, same as V1 invoices: no edits, no conversion, duplicate-only into a new Draft Quote.
 - **Conversion produces an independent snapshot.** Converting a Quote copies its line items (products, quantities, prices, per-line discounts/tax), customer, quote-level discount, and notes/terms into a new `DRAFT` Invoice — exactly like V1's invoice-duplicate flow (`user-flows.md` §5's "Duplication, precisely" paragraph). The new Draft Invoice has no ongoing link back to the Quote's own line items: editing the (already-terminal, `CONVERTED`) Quote is impossible, so there's nothing to keep in sync, but the principle is stated explicitly here because it's the same snapshot discipline `.ai/product.md` locks for invoices, now applied one layer earlier.
 
 **Numbering:** Quotes get their own sequential numbering series, independent of the Invoice series (e.g. `QUO-{year}-{seq}` vs `INV-{year}-{seq}`), same per-business/format-configured-once/never-reused rules as V1 invoice numbering (`user-flows.md` §"Numbering"). A converted Quote keeps its own `QUO-` number permanently (for traceability back from the resulting invoice) — the resulting Invoice gets a normal, newly-generated `INV-` number at conversion time, the same way a duplicated invoice gets its own number at its own eventual issue time.
 
-**Fields specific to a Quote vs. an Invoice:** a **validity/expiry date** (defaults to today + N days, N configurable in Settings, mirroring how due-date defaulting already works) replaces "due date" conceptually — a Quote doesn't have a payment due date, it has a window during which the price is honored.
+**Fields specific to a Quote vs. an Invoice:** a **`valid_until`** date (defaults to today + N days, N configurable in Settings, mirroring how due-date defaulting already works) replaces "due date" conceptually — a Quote doesn't have a payment due date, it has a window during which the price is honored. Naming this precisely matters: Round 3 should model `quotes.valid_until`, never reuse or alias `invoices.due_date`'s name for a conceptually different field.
 
 ## 3. Quote → Invoice conversion flow
 
