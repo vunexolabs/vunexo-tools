@@ -51,6 +51,18 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Set release metadata
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "disclaimer=" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "disclaimer=This is a development build, not an audited release." >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,6 +78,6 @@ jobs:
             - macOS: `.dmg`
             - Linux: `.deb`, `.rpm`, or `.AppImage`
 
-            This is a development build, not an audited release.
+            ${{ steps.meta.outputs.disclaimer }}
           releaseDraft: false
-          prerelease: true
+          prerelease: ${{ steps.meta.outputs.prerelease }}
