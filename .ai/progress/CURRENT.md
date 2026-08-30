@@ -25,7 +25,7 @@ Last updated: 2026-08-30.
 
 Backend: Rust/Tauri/SQLx, `apps/vunexo-billing/src-tauri/`. Frontend: React/TS/Tailwind, `apps/vunexo-billing/src/`. Version is `1.0.0` in `package.json`/`tauri.conf.json`/`Cargo.toml`.
 
-Last commit is `c6015e6`. Run `git status` before assuming the tree is clean.
+Last commit is `221e26e`. Run `git status` before assuming the tree is clean.
 
 | Slice | Backend | Frontend | Tests |
 |---|---|---|---|
@@ -43,7 +43,7 @@ Last commit is `c6015e6`. Run `git status` before assuming the tree is clean.
 | UX audit fixes | — | ✅ `ConfirmDialog`, `SearchablePicker` + quick-add modals, live-updating totals, "Overdue" filter | — |
 | Currency/country | — (pure display config) | ✅ `lib/currency.ts` (60 countries), `hooks/useCurrency.tsx` (app-wide context), every screen money-format-aware | — |
 | Release readiness (license/CI/docs) | ✅ `LICENSE` (MIT), `ADR-002` dependency audit, `THIRD_PARTY_NOTICES.md`, `.github/workflows/ci.yml`, app `README.md` | n/a | CI workflow untested — no push to a remote has triggered it yet |
-| **V2 — Quote lifecycle + tax regime (Round 7, session 12)** | ✅ full lifecycle incl. `convert_quote_to_invoice`'s atomic 2-table transaction; `business.tax_regime_code`, `VAT_STANDARD` presentation (`present_vat`) | ❌ not started | 12 new integration/unit tests, real SQLite. **`main.rs` unwired — no Tauri commands exist for any of this yet**, see below |
+| **V2 — Quote lifecycle + tax regime (Round 7, session 12)** | ✅ full lifecycle incl. `convert_quote_to_invoice`'s atomic 2-table transaction; `business.tax_regime_code`, `VAT_STANDARD` presentation (`present_vat`); **wired into `main.rs`, 11 `commands::*_quote` Tauri commands live**; `quote_number_format` read-only-after-first-issue lock enforced | ❌ not started | 12 new integration/unit tests, real SQLite |
 
 Backend: 128 tests passing (was 116 pre-V2), `cargo fmt`/`clippy` clean modulo the warnings below. Frontend: `pnpm typecheck`/`lint`/`build` all clean (frontend untouched by V2 work so far).
 
@@ -51,7 +51,7 @@ Backend: 128 tests passing (was 116 pre-V2), `cargo fmt`/`clippy` clean modulo t
 
 - `ApplicationError::Infrastructure` field never read — intentional, kept for API completeness.
 - `hooks/useCurrency.tsx` triggers one ESLint `react-refresh/only-export-components` warning (exports both a component and a hook) — cosmetic, common context+hook pattern.
-- **~30 new "never used" dead-code warnings as of session 12** — expected, not a mistake: all of V2's new Quote backend code (`QuoteUseCases`, `SqliteQuoteRepository`, `SqliteQuoteNumberSequencer`, `domain::quote`/`quote_line_item`) compiles and is tested via its own integration tests, but `main.rs` doesn't register any of it with Tauri yet and there are no `commands::*_quote` functions — nothing outside the test module calls it yet. These warnings should disappear the moment `main.rs` is wired (still open, see below), not before.
+- `domain::calculation::present_vat`/`VatPresentation` never used — expected: nothing renders a `VAT_STANDARD` PDF/report yet (that's a later Round 7 slice), so there's no call site until then. Not the ~30-warning situation from earlier in session 12 — `main.rs` is now wired (see below) and that batch of warnings is gone.
 
 ### Things that will bite you if you don't know them
 
@@ -92,11 +92,9 @@ Backend: 128 tests passing (was 116 pre-V2), `cargo fmt`/`clippy` clean modulo t
 
 - **Confirm Windows/Linux installers on real hardware** — the one remaining V1 DoD item. Not urgent (doesn't block using the app), but V1 isn't *fully* closed out until this happens.
 - **V2 design (Rounds 1–6) fully locked** (session 12) — `.ai/product-v2.md` + the six `docs/vunexo-billing/*-v2.md` documents. See the 2026-08-30 daily file for the full history if needed; not repeated here since design is done and this file tracks current state, not history.
-- **V2 Round 7 (implementation) started, session 12 — backend Quote lifecycle done, nothing else.** Real, tested code: `domain::quote`/`quote_line_item`/`tax_regime`, `application::quotes::QuoteUseCases` (full lifecycle incl. `convert_quote_to_invoice`), `SqliteQuoteRepository`/`SqliteQuoteNumberSequencer`, `business.tax_regime_code`, `present_vat`. 128 tests passing, `fmt`/`clippy` clean. **Next, in order**:
-  1. **Wire `main.rs`** — register `QuoteUseCases` + the two new repos with Tauri, add `commands::*_quote` functions (`create_draft_quote`, `update_draft_quote`, `issue_quote`, `accept_quote`, `decline_quote`, `cancel_quote`, `convert_quote_to_invoice`, `duplicate_quote`, `delete_draft_quote`, `get_quote`, `list_quotes`). Without this the new backend is untestable from the running app and invisible to the frontend.
-  2. **Small follow-up**: `quote_number_format`'s read-only-after-first-issue lock (database-schema-v2.md §6) isn't enforced yet in `application::settings` — `SettingsUseCases` needs a `quote_repo` dependency added, mirroring its existing `invoice_repo` check.
-  3. **Round 7 slice 7C**: statements + reports + reminders (application-architecture-v2.md's remaining use cases — `StatementRepository`/`ReportRepository`, `GenerateCustomerStatement`, `GenerateSalesReport`, `GenerateTaxSummaryReport`, `GenerateReminderMessage`).
-  4. **All frontend/UI** (7E–7G in the user's slicing plan): Quote Editor, Customer Statement tab, Reports screens, Payment Reminder modal — nothing started, `apps/vunexo-billing/src/` is untouched by V2 so far.
+- **V2 Round 7 (implementation) in progress, session 12 — backend Quote lifecycle done AND wired.** Real, tested, reachable code: `domain::quote`/`quote_line_item`/`tax_regime`, `application::quotes::QuoteUseCases` (full lifecycle incl. `convert_quote_to_invoice`), `SqliteQuoteRepository`/`SqliteQuoteNumberSequencer`, `business.tax_regime_code`, `present_vat`, all registered in `main.rs`, 11 `commands::*_quote` Tauri commands live, `quote_number_format`'s read-only-after-first-issue lock enforced. 128 tests passing, `fmt`/`clippy` clean (3 warnings, all expected — see above). **Next, in order**:
+  1. **Round 7 slice 7C**: statements + reports + reminders (application-architecture-v2.md's remaining use cases — `StatementRepository`/`ReportRepository`, `GenerateCustomerStatement`, `GenerateSalesReport`, `GenerateTaxSummaryReport`, `GenerateReminderMessage`).
+  2. **All frontend/UI** (7E–7G in the user's slicing plan): Quote Editor, Customer Statement tab, Reports screens, Payment Reminder modal — nothing started, `apps/vunexo-billing/src/` is untouched by V2 so far. The backend commands exist and are callable now, so this is unblocked whenever it's picked up.
 
 ## Verification commands (all of these, every slice)
 
