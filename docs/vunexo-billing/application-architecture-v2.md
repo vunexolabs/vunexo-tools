@@ -3,6 +3,8 @@ status: locked
 round: 4
 ---
 
+**Amendment (Round 6):** `TaxRegimeCode` (§4a) gains its second variant, `VatStandard`, and the "regime dispatch" paragraph below is confirmed rather than left open — see `calculation-engine-v2.md` for the finding that `VatStandard` needs no core-arithmetic branch at all, only its own presentation function. Explicitly deferred to this moment by the original text ("Round 6 adds the second variant here") — filled in now, not a redesign.
+
 # Vunexo Billing — V2 Application Architecture Deltas (Round 4)
 
 This is an AI context file, same status as `docs/vunexo-billing/application-architecture.md`. It is a **delta** document — everything in that file still applies unless overridden below. Built against `docs/vunexo-billing/user-flows-v2.md` and `docs/vunexo-billing/database-schema-v2.md`; does not relitigate either, and does not decide arithmetic (Round 6) or screens (Round 5) — it decides *shape*: use cases, ports, module boundaries, transaction semantics for everything V2 adds.
@@ -162,8 +164,7 @@ Round 3 ruled out a `tax_regimes` configuration table; the corresponding applica
 // domain/tax_regime.rs
 pub enum TaxRegimeCode {
     InGst,
-    // Round 6 adds the second variant here, alongside its CHECK-constraint widening
-    // in database-schema-v2.md §5 — the two changes land together, never separately.
+    VatStandard, // Round 6 — see calculation-engine-v2.md; CHECK-constraint widened in database-schema-v2.md §5
 }
 
 // domain/calculation.rs — existing signature gains one parameter
