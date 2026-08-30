@@ -1,12 +1,35 @@
+<p align="center">
+  <img src="src/assets/vunexo-billing-logo.png" alt="Vunexo Billing" width="220">
+</p>
+
 # Vunexo Billing
 
 Free, open-source, offline-first invoicing for small businesses — retail shops, freelancers, service providers, contractors, traders, small distributors, home businesses, repair shops, small agencies, and independent professionals.
 
 No account, no subscription, no ads, no cloud dependency. All data stays in a local SQLite database on your machine.
 
+## Download
+
+**[Download the latest build](https://github.com/vunexolabs/vunexo-tools/releases)** — pick the installer for your platform from the most recent release's Assets:
+
+| Platform | File |
+|---|---|
+| Windows | `Vunexo_Billing_*_x64-setup.exe` or `Vunexo_Billing_*_x64_en-US.msi` |
+| macOS | `Vunexo_Billing_*_aarch64.dmg` (or the matching Intel build if offered) |
+| Linux | `Vunexo_Billing_*_amd64.deb`, `Vunexo_Billing_*-1.x86_64.rpm`, or the `.AppImage` |
+
+These are unsigned development builds, not notarized/certified releases — Windows SmartScreen and macOS Gatekeeper will both warn on first launch:
+
+- **Windows**: click "More info" → "Run anyway."
+- **macOS**: right-click the app → "Open" (only needed the first time), since double-clicking an unsigned app is blocked by default. If macOS instead says the app **"is damaged and can't be opened"** — this happens on Apple Silicon for a build made before ad-hoc signing was added, or if Gatekeeper still won't budge — it's not actually corrupt; clear the quarantine flag it can't verify:
+  ```bash
+  xattr -cr "/Applications/Vunexo Billing.app"
+  ```
+  then open it normally.
+
 ## Status
 
-In active development (V1). Business profile, customers, products, invoices, payments, PDF generation, the dashboard, and backup/restore/export are implemented and tested — see [`.ai/progress/CURRENT.md`](../../.ai/progress/CURRENT.md) for the exact as-built state. Packaged installers aren't published yet; for now, run it from source.
+In active development (V1). Business profile, customers, products, invoices, payments, PDF generation, the dashboard, and backup/restore/export are implemented and tested — see [`.ai/progress/CURRENT.md`](../../.ai/progress/CURRENT.md) for the exact as-built state.
 
 ## Features (V1 scope)
 
