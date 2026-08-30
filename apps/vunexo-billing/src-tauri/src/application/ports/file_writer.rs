@@ -10,4 +10,9 @@ use super::infrastructure_error::InfrastructureError;
 
 pub trait FileWriter: Send + Sync {
     fn write(&self, path: &Path, bytes: &[u8]) -> Result<(), InfrastructureError>;
+
+    /// Copies `source` to `destination`, creating `destination`'s parent
+    /// directory if it doesn't exist yet. Used to bring a chosen business
+    /// logo into the app's data directory so it travels in backups.
+    fn copy(&self, source: &Path, destination: &Path) -> Result<(), InfrastructureError>;
 }

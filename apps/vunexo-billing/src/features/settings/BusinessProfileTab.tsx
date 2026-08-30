@@ -62,7 +62,13 @@ function BusinessProfileForm({
     setError(null);
     setSaving(true);
     try {
-      await onSave(fields);
+      // The backend imports a freshly chosen logo into its own data
+      // directory and rewrites `logo_path` to the resulting managed
+      // (relative) path — sync the form to what was actually saved, or the
+      // input would keep showing the original absolute path and every
+      // later save would re-import the same file again.
+      const saved = await onSave(fields);
+      setFields(saved);
       setSaved(true);
     } catch (err) {
       setError(err);
@@ -104,9 +110,12 @@ function BusinessProfileForm({
         </label>
       </div>
 
-      {/* The logo is a *path*, not an upload — the app is offline-first and
-          the file stays where the user keeps it. The invoice PDF prints it in
-          the letterhead, and silently omits it if the file has since moved. */}
+      {/* Picking a file here copies it into the app's own data directory
+          (`import_logo_if_chosen`, backend) rather than leaving it wherever
+          the user found it — a bare reference to some arbitrary path
+          wouldn't survive a backup/restore onto a different machine
+          (database-schema.md §9). The invoice PDF prints the imported copy,
+          and silently omits it if that copy has somehow gone missing. */}
       <div className="block text-sm">
         Logo
         <div className="mt-1 flex items-center gap-2">

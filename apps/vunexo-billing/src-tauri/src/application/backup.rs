@@ -6,6 +6,7 @@ use std::sync::Arc;
 use chrono::Utc;
 
 use crate::domain::backup::{check_restorable, BackupMetadata, BackupRejection};
+use crate::domain::business::resolve_logo_path;
 
 use super::error::ApplicationError;
 use super::ports::backup_archive::{ArchiveContents, BackupArchive};
@@ -133,7 +134,11 @@ impl BackupUseCases {
         let Some(logo_path) = business.logo_path.filter(|p| !p.trim().is_empty()) else {
             return Ok(Vec::new());
         };
-        let path = PathBuf::from(&logo_path);
+        // `logo_path` is relative for anything imported since managed logos
+        // landed (`application::business::import_logo_if_chosen`) and
+        // absolute for an older, pre-managed one — `resolve_logo_path`
+        // handles both, the same way the PDF renderer does.
+        let path = resolve_logo_path(&logo_path, &self.data_directory);
         // Archived under a fixed name plus the original extension, so the
         // restore side never has to parse a user-chosen file name.
         let extension = path
@@ -378,6 +383,51 @@ mod integration_tests {
             .data_dir
             .join("vunexo-billing.db.vunexo-staging")
             .exists());
+    }
+
+    #[tokio::test]
+    async fn a_managed_logo_survives_a_restore_onto_a_different_data_directory() {
+        // The bug this exists to catch: a *relative*, app-managed logo_path
+        // must resolve correctly again after landing in a brand new data
+        // directory (a different machine, or a different user account) —
+        // unlike a legacy absolute path, which only ever worked on the
+        // machine that chose it.
+        let app = setup("managed_logo_restore").await;
+        let logo = app.data_dir.join("assets").join("business-logo.png");
+        std::fs::create_dir_all(logo.parent().unwrap()).unwrap();
+        std::fs::write(&logo, b"pretend png bytes").unwrap();
+        // What `import_logo_if_chosen` actually stores: relative, not absolute.
+        save_business(&app, "Acme", Some("assets/business-logo.png".to_string())).await;
+
+        let archive = app.data_dir.join("backup.vbx");
+        app.backups.backup_to(&archive).await.expect("backup_to");
+
+        // A fresh data directory — standing in for "a different machine" —
+        // with nothing pre-existing at the path the restored logo_path names.
+        let other_machine_dir = unique_dir("managed_logo_other_machine");
+        let restored_db = other_machine_dir.join("vunexo-billing.db");
+        let restored_assets = other_machine_dir.join("assets");
+        VbxArchive::new()
+            .extract(&archive, &restored_db, &restored_assets)
+            .expect("extract");
+
+        let pool = init_pool(&restored_db).await.expect("reopen");
+        let repo = SqliteBusinessRepository::new(pool);
+        let restored = repo.get().await.unwrap().unwrap();
+
+        // The stored value is unchanged (still relative) — resolving it
+        // against the *new* data directory must still find the file.
+        assert_eq!(
+            restored.logo_path.as_deref(),
+            Some("assets/business-logo.png")
+        );
+        let resolved = crate::domain::business::resolve_logo_path(
+            restored.logo_path.as_deref().unwrap(),
+            &other_machine_dir,
+        );
+        assert_eq!(std::fs::read(&resolved).unwrap(), b"pretend png bytes");
+
+        let _ = std::fs::remove_dir_all(&other_machine_dir);
     }
 
     #[tokio::test]

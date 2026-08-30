@@ -17,7 +17,7 @@ Last updated: 2026-08-30.
 
 Round 7 (implementation) in progress. Backend: Rust/Tauri/SQLx, `apps/vunexo-billing/src-tauri/`. Frontend: React/TS/Tailwind, `apps/vunexo-billing/src/`.
 
-Last commit is `b98cf41`. Run `git status` before assuming the tree is clean.
+Last commit is `147ac93`. Run `git status` before assuming the tree is clean.
 
 | Slice | Backend | Frontend | Tests |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Last commit is `b98cf41`. Run `git status` before assuming the tree is clean.
 | UX audit fixes | — | ✅ `ConfirmDialog`, `SearchablePicker` + quick-add modals, live-updating totals, "Overdue" filter | — |
 | Currency/country | — (pure display config) | ✅ `lib/currency.ts` (60 countries), `hooks/useCurrency.tsx` (app-wide context), every screen money-format-aware | — |
 
-Backend: 106 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — see below). Frontend: `pnpm typecheck`/`lint`/`build` all clean.
+Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — see below). Frontend: `pnpm typecheck`/`lint`/`build` all clean.
 
 ### Pre-existing harmless warnings (don't "fix" without a reason)
 
@@ -47,6 +47,7 @@ Backend: 106 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 - **`printpdf` must keep its `text_layout` feature.** Font subsetting only exists on that feature (`prepare_fonts_for_serialization` has a `#[cfg(not(...))]` arm that embeds the full face). Removing it to slim the dependency tree turns a 32 KB invoice into a 743 KB one. The feature also changes `ParsedFont`'s API — see `infrastructure/pdf/fonts.rs`.
 - **Restore closes the database pool and restarts the app**, and must: every repository holds that pool. `restore_backup` never returns on success. Validation happens *before* the pool closes, and extraction goes to a staging file first, so a rejected or corrupt archive leaves the running app untouched.
 - **Backups must use `VACUUM INTO`, not a file copy.** WAL mode means the main `.db` file alone is missing committed data.
+- **`business.logo_path` is stored relative (`assets/business-logo.png`) for any logo chosen since 2026-08-30 session 4, and absolute for anything chosen before that** — `domain::business::resolve_logo_path` is the one place that knows both. Every reader (`PdfUseCases`, `probe_business_logo`, backup's `assets_to_archive`) must resolve through it rather than opening `logo_path` directly, or a managed logo on a restored/different machine silently fails to open.
 - **`domain/currency.rs` and `src/lib/currency.ts` are two copies of the same table.** Add a currency to both, or the screen and the PDF disagree.
 - The embedded DejaVu Sans has no glyph for BDT's `৳` or SAR's `﷼`; those fall back to the ISO code by design (`Fonts::can_render`). Don't "fix" it without swapping the font.
 - **An issued invoice prints its frozen business snapshot**, so changing the logo (or address, or bank details) in Settings does *not* change invoices already issued — by design (`.ai/product.md`'s locked snapshot principle). Editing one and saving re-snapshots it. This looks like a bug when reported ("my logo isn't showing"); check `business_snapshot_logo_path` on the actual invoice before hunting in the renderer.
@@ -58,14 +59,13 @@ Backend: 106 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 - Line-level discounts: engine supports them, editor UI only exposes invoice-level discount.
 - Dashboard metric cards aren't clickable-through to a filtered Invoices List (recent-invoices rows are). Needs `InvoiceFilter` to support a derived `OVERDUE` pseudo-status plus lifting filter state out of `InvoicesList`.
 - The PDF prints one neutral `Tax` line outside India rather than a CGST/SGST/IGST split — same India-only constraint as above, and the Invoice Editor's on-screen totals now match it.
-- `business.logo_path` stores wherever the user picked the file, but `database-schema.md` §9 assumes assets live under the app data directory. Backup archives the file and restore writes it to `<data_dir>/assets/`, but the restored `logo_path` still points at the original location — so restoring onto a different machine leaves the logo unresolved (the Settings probe says so plainly). Fix by copying the image into the data directory at pick time. **Worth doing before V1 ships.**
 - Restore has full test coverage but hasn't been clicked through in the running app — `app.restart()` specifically can only be confirmed by hand.
 
 ## Next up (agreed order)
 
 1. ~~PDF generation~~ — done 2026-08-30 (session 2). See the daily file for the library choice, the layering, and the font trade-off.
 2. ~~Backup/restore + export~~ — done 2026-08-30 (session 3).
-3. Make `business.logo_path` app-managed (see Known gaps) — small, and it closes the last gap between the schema doc and the as-built code.
+3. ~~Make `business.logo_path` app-managed~~ — done 2026-08-30 (session 4).
 4. Another audit pass, same method as 2026-08-30's — the PDF template and the restore flow have only been checked against tests and generated samples, not against a real business's data on a second machine.
 
 ## Verification commands (all of these, every slice)
@@ -84,4 +84,4 @@ The user's `pnpm tauri dev` session tends to stay running for an entire work ses
 
 - `2026-08-28.md` — Rounds 1–6 locked; Business/Customers/Products CRUD + calculation engine implemented.
 - `2026-08-29.md` — Invoices vertical slice (draft/issue/cancel/duplicate/list).
-- `2026-08-30.md` — two sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data).
+- `2026-08-30.md` — two sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine.

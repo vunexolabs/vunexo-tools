@@ -29,4 +29,20 @@ impl FileWriter for StdFileWriter {
             InfrastructureError::Io(format!("could not write {}: {err}", path.display()))
         })
     }
+
+    fn copy(&self, source: &Path, destination: &Path) -> Result<(), InfrastructureError> {
+        if let Some(parent) = destination.parent() {
+            std::fs::create_dir_all(parent).map_err(|err| {
+                InfrastructureError::Io(format!("could not create {}: {err}", parent.display()))
+            })?;
+        }
+        std::fs::copy(source, destination).map_err(|err| {
+            InfrastructureError::Io(format!(
+                "could not copy {} to {}: {err}",
+                source.display(),
+                destination.display()
+            ))
+        })?;
+        Ok(())
+    }
 }

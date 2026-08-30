@@ -133,7 +133,12 @@ mod integration_tests {
                 tx_manager.clone(),
             ),
             customers: CustomerUseCases::new(customer_repo, tx_manager.clone()),
-            business: BusinessUseCases::new(business_repo, tx_manager),
+            business: BusinessUseCases::new(
+                business_repo,
+                tx_manager,
+                Arc::new(crate::infrastructure::filesystem::file_writer::StdFileWriter::new()),
+                db_path.parent().unwrap().to_path_buf(),
+            ),
             db_path,
         }
     }

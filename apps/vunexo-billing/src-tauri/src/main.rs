@@ -94,6 +94,8 @@ fn main() {
             app.manage(BusinessUseCases::new(
                 business_repo.clone(),
                 tx_manager.clone(),
+                file_writer.clone(),
+                data_dir.clone(),
             ));
             app.manage(CustomerUseCases::new(
                 customer_repo.clone(),
@@ -121,6 +123,7 @@ fn main() {
                 payment_repo.clone(),
                 pdf_renderer,
                 file_writer.clone(),
+                data_dir.clone(),
             ));
             app.manage(TaxRateUseCases::new(
                 tax_rate_repo.clone(),

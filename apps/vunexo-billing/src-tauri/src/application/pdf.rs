@@ -5,9 +5,10 @@
 //! needs, hand it to `domain::invoice_pdf` to turn into finished text, hand
 //! *that* to the renderer port. No formatting, no layout, no `printpdf`.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::domain::business::resolve_logo_path;
 use crate::domain::invoice::{Invoice, InvoiceStatus};
 use crate::domain::invoice_pdf::{build_invoice_pdf_document, InvoicePdfInput, LogoProbe};
 
@@ -37,6 +38,11 @@ pub struct PdfUseCases {
     payment_repo: Arc<dyn PaymentRepository>,
     renderer: Arc<dyn InvoicePdfRenderer>,
     file_writer: Arc<dyn FileWriter>,
+    /// Needed only to resolve a *managed* logo path (`business::MANAGED_LOGO_DIRECTORY`,
+    /// stored relative so it survives a backup/restore onto a different
+    /// machine — see `application::business::import_logo_if_chosen`). A
+    /// legacy absolute path is untouched by `resolve_logo_path` regardless.
+    data_directory: PathBuf,
 }
 
 impl PdfUseCases {
@@ -49,6 +55,7 @@ impl PdfUseCases {
         payment_repo: Arc<dyn PaymentRepository>,
         renderer: Arc<dyn InvoicePdfRenderer>,
         file_writer: Arc<dyn FileWriter>,
+        data_directory: PathBuf,
     ) -> Self {
         Self {
             invoice_repo,
@@ -58,6 +65,7 @@ impl PdfUseCases {
             payment_repo,
             renderer,
             file_writer,
+            data_directory,
         }
     }
 
@@ -100,13 +108,22 @@ impl PdfUseCases {
             .map(|payment| payment.amount_minor)
             .sum();
 
-        let document = build_invoice_pdf_document(InvoicePdfInput {
+        let mut document = build_invoice_pdf_document(InvoicePdfInput {
             invoice: &invoice.invoice,
             line_items: &invoice.line_items,
             settings: &settings,
             live_business: live_business.as_ref(),
             live_customer: live_customer.as_ref(),
             amount_paid_minor,
+        });
+        // `build_invoice_pdf_document` is pure domain code and knows nothing
+        // of the filesystem, so a managed (relative) logo path comes back
+        // exactly as stored. Resolve it here, at the one seam that does know
+        // where the data directory is, before it reaches the renderer.
+        document.logo_path = document.logo_path.map(|stored| {
+            resolve_logo_path(&stored, &self.data_directory)
+                .to_string_lossy()
+                .into_owned()
         });
 
         Ok(RenderedInvoicePdf {
@@ -119,8 +136,14 @@ impl PdfUseCases {
     /// skips an unloadable logo rather than failing the invoice, so without
     /// this the only way to find out is to notice its absence on a finished
     /// PDF.
+    ///
+    /// `path` arrives exactly as `business.logo_path` stores it — relative
+    /// for anything chosen since this managed-path support landed, absolute
+    /// for a legacy one — so it goes through the same resolution the render
+    /// path uses before the renderer ever sees it.
     pub fn probe_logo(&self, path: &Path) -> LogoProbe {
-        self.renderer.probe_logo(path)
+        let resolved = resolve_logo_path(&path.to_string_lossy(), &self.data_directory);
+        self.renderer.probe_logo(&resolved)
     }
 
     /// Renders and writes to a path the user already chose in the OS save
