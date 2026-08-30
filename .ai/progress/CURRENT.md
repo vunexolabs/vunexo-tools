@@ -15,9 +15,11 @@ Last updated: 2026-08-30.
 
 ## Current state
 
-Round 7 (implementation) in progress. Backend: Rust/Tauri/SQLx, `apps/vunexo-billing/src-tauri/`. Frontend: React/TS/Tailwind, `apps/vunexo-billing/src/`.
+**V1 shipped as a real release: `app-v1.0.0`, published (not prerelease) at https://github.com/vunexolabs/vunexo-tools/releases/tag/app-v1.0.0** (2026-08-30, session 11). Every V1 Definition-of-Done item in `.ai/product.md` is implemented and tested. The only unconfirmed DoD line is Windows/Linux installers running on real hardware by a human — macOS is confirmed (session 11), Windows/Linux are not.
 
-Last commit is `147ac93`. Run `git status` before assuming the tree is clean.
+Backend: Rust/Tauri/SQLx, `apps/vunexo-billing/src-tauri/`. Frontend: React/TS/Tailwind, `apps/vunexo-billing/src/`. Version is `1.0.0` in `package.json`/`tauri.conf.json`/`Cargo.toml`.
+
+Last commit is `c6015e6`. Run `git status` before assuming the tree is clean.
 
 | Slice | Backend | Frontend | Tests |
 |---|---|---|---|
@@ -65,7 +67,7 @@ Backend: 116 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 - The PDF prints one neutral `Tax` line outside India rather than a CGST/SGST/IGST split — same India-only constraint as above, and the Invoice Editor's on-screen totals now match it.
 - Restore has full test coverage, now including a round-trip against a real-data-shaped copy (session 6), but still hasn't been clicked through in the running app — `app.restart()` specifically can only be confirmed by hand.
 
-## Next up (agreed order)
+## History (agreed order)
 
 1. ~~PDF generation~~ — done 2026-08-30 (session 2). See the daily file for the library choice, the layering, and the font trade-off.
 2. ~~Backup/restore + export~~ — done 2026-08-30 (session 3).
@@ -75,6 +77,13 @@ Backend: 116 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 6. ~~Release readiness: license, CI, docs~~ — done 2026-08-30 (session 8), pushed 2026-08-30 (session 9). **First CI run caught a real cross-OS bug** (`domain::business::is_managed_logo_path` used `Path::is_absolute()`, which is platform-dependent — a legacy Unix logo path restored onto Windows was misjudged as a *managed* relative one). Fixed to a portable string check + a regression test covering Unix/Windows-drive/UNC forms; also fixed the CI workflow itself (`node-version: 20` → `22`, pnpm 11.7 requires ≥22.13). Second run: **fully green** on Ubuntu/Windows/macOS.
 7. ~~Publish a real installer build~~ — done 2026-08-30 (session 9): `.github/workflows/release.yml` (manual `workflow_dispatch` or an `app-v*` tag), using `tauri-action` across a Windows/macOS/Ubuntu matrix. First attempt built successfully on all three but failed to publish ("Resource not accessible by integration" — the default `GITHUB_TOKEN` lacks `contents: write` unless a workflow explicitly requests it); fixed with an explicit `permissions:` block. Second attempt published a real public release: https://github.com/vunexolabs/vunexo-tools/releases (tag `app-v0.0.0-manual2`, marked prerelease — a manual dev-build tag, not a real version number). **Nobody has actually run these installers on a real Windows/Linux machine yet** — that's still the one thing only a human, on real hardware, can confirm.
 8. ~~Product logo + branding~~ — done 2026-08-30 (session 10): app icons (all platforms), a web favicon, and both READMEs now carry the real Vunexo Billing logo, plus a "Download" section in `apps/vunexo-billing/README.md` pointing at the GitHub Releases page (with the SmartScreen/Gatekeeper unsigned-build warning spelled out, since users will hit it immediately).
+9. ~~Confirm macOS build works on real hardware~~ — done 2026-08-30 (session 11): user downloaded and ran the `.dmg`, ad-hoc signing fix from session 10 confirmed working, no Gatekeeper "damaged" error.
+10. ~~Cut a real v1.0.0 release~~ — done 2026-08-30 (session 11): version bumped to `1.0.0` across `package.json`/`tauri.conf.json`/`Cargo.toml`/`Cargo.lock`, tagged `app-v1.0.0`, release workflow fixed so real tags publish `prerelease: false` (previously always `true`, a leftover from the manual-dev-build era) — both the workflow and the already-published release were corrected. https://github.com/vunexolabs/vunexo-tools/releases/tag/app-v1.0.0
+
+## Next up
+
+- **Confirm Windows/Linux installers on real hardware** — the one remaining V1 DoD item. Not urgent (doesn't block using the app), but V1 isn't *fully* closed out until this happens.
+- **Scope V2.** Candidate per `.ai/product.md`'s locked "known gaps": multi-country tax support (currently India-GST-only; currency display is already dynamic per-country, tax regime logic is not). Nothing scoped or prioritized yet — needs a fresh Round-1-style spec conversation, not a code dive.
 
 ## Verification commands (all of these, every slice)
 
@@ -92,4 +101,4 @@ The user's `pnpm tauri dev` session tends to stay running for an entire work ses
 
 - `2026-08-28.md` — Rounds 1–6 locked; Business/Customers/Products CRUD + calculation engine implemented.
 - `2026-08-29.md` — Invoices vertical slice (draft/issue/cancel/duplicate/list).
-- `2026-08-30.md` — ten sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects. Session 6: audited backup/restore against a real-data-shaped copy — passed, no defects. Session 7: fixed the two actionable known gaps (line-level discount UI, Dashboard Overdue click-through). Session 8: release readiness — license, CI, third-party notices, app README. Session 9: pushed to GitHub, fixed what CI's first real run caught (a cross-OS logo-path bug, plus a CI config bug), then built and published the first real installers via a new release workflow. Session 10: added the real Vunexo Billing logo — app icons, favicon, both READMEs, a public-facing Download section.
+- `2026-08-30.md` — eleven sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects. Session 6: audited backup/restore against a real-data-shaped copy — passed, no defects. Session 7: fixed the two actionable known gaps (line-level discount UI, Dashboard Overdue click-through). Session 8: release readiness — license, CI, third-party notices, app README. Session 9: pushed to GitHub, fixed what CI's first real run caught (a cross-OS logo-path bug, plus a CI config bug), then built and published the first real installers via a new release workflow. Session 10: added the real Vunexo Billing logo — app icons, favicon, both READMEs, a public-facing Download section. Session 11: macOS build confirmed working on real hardware; cut and published the real `app-v1.0.0` release, fixing the release workflow so real tags publish as full (non-prerelease) releases.
