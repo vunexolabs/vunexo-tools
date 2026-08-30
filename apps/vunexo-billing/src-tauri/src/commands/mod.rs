@@ -21,6 +21,7 @@ use crate::domain::dashboard::DashboardMetrics;
 use crate::domain::invoice::{
     DraftInvoiceInput, InvoiceFilter, InvoiceSummary, InvoiceWithLineItems,
 };
+use crate::domain::invoice_pdf::LogoProbe;
 use crate::domain::payment::{NewPayment, Payment, PaymentFields};
 use crate::domain::product::{Product, ProductFields, ProductFilter, ProductListItem};
 use crate::domain::settings::{Settings, SettingsFields};
@@ -354,6 +355,14 @@ pub async fn render_invoice_pdf(
         file_name: rendered.file_name,
         bytes_base64: BASE64_STANDARD.encode(&rendered.bytes),
     })
+}
+
+/// Reports whether the business logo at `path` can actually be printed, so
+/// Settings can say so at the moment it is chosen rather than leaving the
+/// user to infer it from a logo-less invoice.
+#[tauri::command]
+pub fn probe_business_logo(pdf_use_cases: State<'_, PdfUseCases>, path: String) -> LogoProbe {
+    pdf_use_cases.probe_logo(std::path::Path::new(&path))
 }
 
 /// `path` is whatever the OS save dialog returned to the frontend; the PDF

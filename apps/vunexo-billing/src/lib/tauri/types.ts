@@ -187,6 +187,12 @@ export interface TaxRateFields {
 
 export type InvoiceStatus = "DRAFT" | "ISSUED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
 
+/** What `probe_business_logo` returns — whether the chosen logo can actually be printed. */
+export type LogoProbe =
+  | { status: "OK"; width_px: number; height_px: number }
+  | { status: "NOT_FOUND" }
+  | { status: "UNREADABLE" };
+
 /** What `render_invoice_pdf` returns — see the command's own note on the base64. */
 export interface RenderedInvoicePdf {
   file_name: string;

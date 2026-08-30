@@ -17,7 +17,7 @@ Last updated: 2026-08-30.
 
 Round 7 (implementation) in progress. Backend: Rust/Tauri/SQLx, `apps/vunexo-billing/src-tauri/`. Frontend: React/TS/Tailwind, `apps/vunexo-billing/src/`.
 
-**⚠️ Uncommitted work-in-progress.** Last commit is `6209e06` ("Round 7: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, currency support"). The PDF-generation slice below exists only in the working tree. Run `git status` before assuming otherwise.
+Last commit is `3804d35` ("Round 7: PDF generation"). Run `git status` before assuming the tree is clean.
 
 | Slice | Backend | Frontend | Tests |
 |---|---|---|---|
@@ -33,7 +33,7 @@ Round 7 (implementation) in progress. Backend: Rust/Tauri/SQLx, `apps/vunexo-bil
 | UX audit fixes | — | ✅ `ConfirmDialog`, `SearchablePicker` + quick-add modals, live-updating totals, "Overdue" filter | — |
 | Currency/country | — (pure display config) | ✅ `lib/currency.ts` (60 countries), `hooks/useCurrency.tsx` (app-wide context), every screen money-format-aware | — |
 
-Backend: 73 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — see below). Frontend: `pnpm typecheck`/`lint`/`build` all clean.
+Backend: 76 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — see below). Frontend: `pnpm typecheck`/`lint`/`build` all clean.
 
 ### Pre-existing harmless warnings (don't "fix" without a reason)
 
@@ -45,6 +45,8 @@ Backend: 73 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — se
 - **`printpdf` must keep its `text_layout` feature.** Font subsetting only exists on that feature (`prepare_fonts_for_serialization` has a `#[cfg(not(...))]` arm that embeds the full face). Removing it to slim the dependency tree turns a 32 KB invoice into a 743 KB one. The feature also changes `ParsedFont`'s API — see `infrastructure/pdf/fonts.rs`.
 - **`domain/currency.rs` and `src/lib/currency.ts` are two copies of the same table.** Add a currency to both, or the screen and the PDF disagree.
 - The embedded DejaVu Sans has no glyph for BDT's `৳` or SAR's `﷼`; those fall back to the ISO code by design (`Fonts::can_render`). Don't "fix" it without swapping the font.
+- **An issued invoice prints its frozen business snapshot**, so changing the logo (or address, or bank details) in Settings does *not* change invoices already issued — by design (`.ai/product.md`'s locked snapshot principle). Editing one and saving re-snapshots it. This looks like a bug when reported ("my logo isn't showing"); check `business_snapshot_logo_path` on the actual invoice before hunting in the renderer.
+- macOS screenshot filenames contain U+202F (narrow no-break space) before `AM`/`PM`. Retyping such a path with an ordinary space silently finds nothing — copy it, don't retype it.
 
 ## Known gaps (deliberate, not oversights)
 

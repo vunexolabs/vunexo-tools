@@ -9,7 +9,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::domain::invoice::{Invoice, InvoiceStatus};
-use crate::domain::invoice_pdf::{build_invoice_pdf_document, InvoicePdfInput};
+use crate::domain::invoice_pdf::{build_invoice_pdf_document, InvoicePdfInput, LogoProbe};
 
 use super::error::ApplicationError;
 use super::ports::business_repository::BusinessRepository;
@@ -113,6 +113,14 @@ impl PdfUseCases {
             file_name: suggested_file_name(&invoice.invoice),
             bytes: self.renderer.render(&document)?,
         })
+    }
+
+    /// Answers "will this logo actually print?" for Settings. The renderer
+    /// skips an unloadable logo rather than failing the invoice, so without
+    /// this the only way to find out is to notice its absence on a finished
+    /// PDF.
+    pub fn probe_logo(&self, path: &Path) -> LogoProbe {
+        self.renderer.probe_logo(path)
     }
 
     /// Renders and writes to a path the user already chose in the OS save

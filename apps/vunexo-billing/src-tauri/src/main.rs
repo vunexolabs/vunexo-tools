@@ -163,6 +163,7 @@ fn main() {
             commands::list_tax_rates,
             commands::get_dashboard_metrics,
             commands::render_invoice_pdf,
+            commands::probe_business_logo,
             commands::save_invoice_pdf,
         ])
         .run(tauri::generate_context!())

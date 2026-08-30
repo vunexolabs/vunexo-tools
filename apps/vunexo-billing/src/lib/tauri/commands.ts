@@ -12,6 +12,7 @@ import type {
   InvoiceFilter,
   InvoiceSummary,
   InvoiceWithLineItems,
+  LogoProbe,
   NewPayment,
   Payment,
   PaymentFields,
@@ -188,6 +189,16 @@ export function getDashboardMetrics(): Promise<DashboardMetrics> {
  */
 export function renderInvoicePdf(id: number): Promise<RenderedInvoicePdf> {
   return callCommand<RenderedInvoicePdf>("render_invoice_pdf", { id });
+}
+
+/**
+ * Whether the business logo at `path` can actually be printed. The PDF
+ * renderer skips a logo it can't load rather than failing the invoice, so
+ * Settings asks this instead of letting the user find out from a logo-less
+ * invoice.
+ */
+export function probeBusinessLogo(path: string): Promise<LogoProbe> {
+  return callCommand<LogoProbe>("probe_business_logo", { path });
 }
 
 /** Writes the invoice PDF to a path already chosen in the OS save dialog. */

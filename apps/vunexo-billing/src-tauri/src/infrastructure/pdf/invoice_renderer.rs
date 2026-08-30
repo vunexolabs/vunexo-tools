@@ -8,11 +8,13 @@
 //! placement, and pagination — it must not format a number, a date, or a tax
 //! label, and it has no access to an invoice, a customer, or a setting.
 
+use std::path::Path;
+
 use printpdf::{PdfDocument, PdfPage, PdfSaveOptions, Pt, RawImage, XObjectId};
 
 use crate::application::ports::infrastructure_error::InfrastructureError;
 use crate::application::ports::invoice_pdf_renderer::InvoicePdfRenderer;
-use crate::domain::invoice_pdf::{InvoicePdfDocument, PdfParty, TotalWeight};
+use crate::domain::invoice_pdf::{InvoicePdfDocument, LogoProbe, PdfParty, TotalWeight};
 
 use super::canvas::{rgb, Align, Canvas, TextStyle};
 use super::fonts::{FontRole, Fonts};
@@ -145,6 +147,22 @@ impl InvoicePdfRenderer for PrintpdfInvoiceRenderer {
         Ok(pdf
             .with_pages(pages)
             .save(&PdfSaveOptions::default(), &mut Vec::new()))
+    }
+
+    fn probe_logo(&self, path: &Path) -> LogoProbe {
+        // Deliberately the same two steps, in the same order, as `load_logo`
+        // — a probe that answered a different question than the renderer
+        // asks would be worse than no probe.
+        let Ok(bytes) = std::fs::read(path) else {
+            return LogoProbe::NotFound;
+        };
+        match RawImage::decode_from_bytes(&bytes, &mut Vec::new()) {
+            Ok(image) => LogoProbe::Ok {
+                width_px: image.width as u32,
+                height_px: image.height as u32,
+            },
+            Err(_) => LogoProbe::Unreadable,
+        }
     }
 }
 
@@ -874,6 +892,42 @@ mod tests {
         let pages = text_by_page(&render(&doc));
         assert_eq!(pages.len(), 1);
         assert!(pages[0].contains("Acme Traders"));
+    }
+
+    #[test]
+    fn probing_reports_a_usable_logo_with_its_pixel_size() {
+        // A 1x1 PNG, so the probe has something real to decode.
+        let png: &[u8] = &[
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
+            0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00,
+            0x00, 0x90, 0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08,
+            0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D,
+            0xB0, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+        ];
+        let path = std::env::temp_dir().join("vunexo-probe-ok.png");
+        std::fs::write(&path, png).unwrap();
+        assert_eq!(
+            PrintpdfInvoiceRenderer::new().probe_logo(&path),
+            LogoProbe::Ok {
+                width_px: 1,
+                height_px: 1
+            }
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn probing_distinguishes_a_moved_file_from_an_undecodable_one() {
+        let renderer = PrintpdfInvoiceRenderer::new();
+        assert_eq!(
+            renderer.probe_logo(Path::new("/definitely/not/a/real/logo.png")),
+            LogoProbe::NotFound
+        );
+
+        let path = std::env::temp_dir().join("vunexo-probe-bad.png");
+        std::fs::write(&path, b"this is not an image").unwrap();
+        assert_eq!(renderer.probe_logo(&path), LogoProbe::Unreadable);
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

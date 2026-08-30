@@ -7,10 +7,18 @@
 //! Not `async`: rendering is pure CPU work with no I/O to await except
 //! reading the logo file, which the implementation does synchronously.
 
-use crate::domain::invoice_pdf::InvoicePdfDocument;
+use std::path::Path;
+
+use crate::domain::invoice_pdf::{InvoicePdfDocument, LogoProbe};
 
 use super::infrastructure_error::InfrastructureError;
 
 pub trait InvoicePdfRenderer: Send + Sync {
     fn render(&self, document: &InvoicePdfDocument) -> Result<Vec<u8>, InfrastructureError>;
+
+    /// Whether `path` is an image this renderer could actually place on a
+    /// page — the same read-and-decode the letterhead does, asked ahead of
+    /// time so Settings can tell the user before an invoice silently prints
+    /// without their logo.
+    fn probe_logo(&self, path: &Path) -> LogoProbe;
 }

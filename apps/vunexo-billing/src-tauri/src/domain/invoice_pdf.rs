@@ -33,6 +33,25 @@ use super::settings::Settings;
 /// printed rather than inventing a regime this app does not actually compute.
 const INDIA_COUNTRY_CODE: &str = "IN";
 
+/// What became of a business logo the user chose. The renderer skips a logo
+/// it cannot load rather than failing the invoice — which is the right call
+/// for a render, but leaves the user with no way to tell a working logo from
+/// a broken path, so Settings asks this question directly and says so.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "status", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum LogoProbe {
+    Ok {
+        width_px: u32,
+        height_px: u32,
+    },
+    /// Nothing at that path any more — moved, renamed, or on a volume that
+    /// isn't mounted.
+    NotFound,
+    /// The file is there but isn't an image this build can decode (PNG and
+    /// JPEG are what the PDF pipeline is compiled for).
+    Unreadable,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CurrencyDisplay {
     /// e.g. `₹` — `None` when this app's currency table has no symbol for the code.
@@ -173,8 +192,14 @@ fn watermark_for(status: InvoiceStatus) -> Option<String> {
 
 /// Snapshot first, live record second — an issued invoice must print what it
 /// froze, never what the master record says today.
+///
+/// Each side is emptiness-checked *before* the choice, not after: a snapshot
+/// field stored as `""` rather than `NULL` would otherwise win the `or` and
+/// then be discarded, printing nothing where the live record had a perfectly
+/// good value.
 fn snapshot_or_live<'a>(snapshot: Option<&'a str>, live: Option<&'a str>) -> Option<&'a str> {
-    snapshot.or(live).filter(|s| !s.trim().is_empty())
+    let usable = |value: Option<&'a str>| value.filter(|s| !s.trim().is_empty());
+    usable(snapshot).or_else(|| usable(live))
 }
 
 fn logo_path(invoice: &Invoice, live_business: Option<&Business>) -> Option<String> {
@@ -724,6 +749,27 @@ mod tests {
         assert_eq!(doc.meta[0].1, "(not yet issued)");
         // A draft has no due date here, so the row must be absent rather than blank.
         assert!(doc.meta.iter().all(|(label, _)| label != "Due Date"));
+    }
+
+    #[test]
+    fn an_empty_snapshot_field_falls_through_to_the_live_record() {
+        // `""` is not `NULL`: an empty stored field must not beat a usable
+        // live one and then be dropped for being blank.
+        let mut invoice = draft_invoice();
+        invoice.business_snapshot_name = Some("   ".to_string());
+        invoice.business_snapshot_logo_path = Some(String::new());
+        let business = live_business();
+        let doc = build(
+            &invoice,
+            &[],
+            &settings("IN", "INR"),
+            Some(&business),
+            None,
+            0,
+        );
+
+        assert_eq!(doc.business.name, "Live Business");
+        assert_eq!(doc.logo_path.as_deref(), Some("/live/logo.png"));
     }
 
     #[test]

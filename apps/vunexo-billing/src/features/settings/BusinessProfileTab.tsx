@@ -1,6 +1,8 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { chooseOpenPath } from "../../lib/tauri/client";
+import { probeBusinessLogo } from "../../lib/tauri/commands";
+import type { LogoProbe } from "../../lib/tauri/types";
 import { useBusiness } from "../../hooks/useBusiness";
 import type { Business } from "../../lib/tauri/types";
 
@@ -26,6 +28,29 @@ function BusinessProfileForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
+  // The PDF renderer skips a logo it can't load rather than failing the
+  // invoice — right for a render, but it means a moved or unsupported file
+  // shows up only as a logo-less invoice. So say it here, where it's fixable.
+  const [logoProbe, setLogoProbe] = useState<LogoProbe | null>(null);
+
+  const logoPath = fields.logo_path;
+  useEffect(() => {
+    if (!logoPath) {
+      setLogoProbe(null);
+      return;
+    }
+    let stale = false;
+    probeBusinessLogo(logoPath)
+      .then((probe) => {
+        if (!stale) setLogoProbe(probe);
+      })
+      .catch(() => {
+        if (!stale) setLogoProbe(null);
+      });
+    return () => {
+      stale = true;
+    };
+  }, [logoPath]);
 
   const set = (key: keyof Business) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setSaved(false);
@@ -118,6 +143,23 @@ function BusinessProfileForm({
             </button>
           )}
         </div>
+        {logoProbe?.status === "OK" && (
+          <p className="mt-1 text-xs text-emerald-400">
+            Ready to print — {logoProbe.width_px} × {logoProbe.height_px} px.
+          </p>
+        )}
+        {logoProbe?.status === "NOT_FOUND" && (
+          <p className="mt-1 text-xs text-amber-400">
+            That file isn't there any more — it was moved, renamed, or is on a drive that isn't connected. Choose it again.
+          </p>
+        )}
+        {logoProbe?.status === "UNREADABLE" && (
+          <p className="mt-1 text-xs text-amber-400">That file can't be read as an image. PNG and JPEG print correctly.</p>
+        )}
+        <p className="mt-1 text-xs text-slate-500">
+          Invoices already issued keep the logo they were issued with — they're a frozen record. Opening one and pressing
+          "Save Changes" re-snapshots it, and every new invoice picks this up automatically.
+        </p>
       </div>
 
       <label className="block text-sm">
