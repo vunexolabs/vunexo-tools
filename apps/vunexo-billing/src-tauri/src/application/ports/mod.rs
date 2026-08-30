@@ -2,9 +2,11 @@
 //! docs/vunexo-billing/architecture.md. `application` owns these traits;
 //! `infrastructure` implements them.
 
+pub mod backup_archive;
 pub mod business_repository;
 pub mod customer_repository;
 pub mod dashboard_repository;
+pub mod database_file;
 pub mod file_writer;
 pub mod infrastructure_error;
 pub mod invoice_number_sequencer;

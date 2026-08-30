@@ -5,9 +5,11 @@
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use tauri::State;
 
+use crate::application::backup::BackupUseCases;
 use crate::application::business::BusinessUseCases;
 use crate::application::customers::CustomerUseCases;
 use crate::application::dashboard::DashboardUseCases;
+use crate::application::export::ExportUseCases;
 use crate::application::invoices::InvoiceUseCases;
 use crate::application::payments::PaymentUseCases;
 use crate::application::pdf::PdfUseCases;
@@ -15,9 +17,11 @@ use crate::application::products::ProductUseCases;
 use crate::application::settings::SettingsUseCases;
 use crate::application::tax_rates::TaxRateUseCases;
 use crate::application::ApplicationError;
+use crate::domain::backup::{backup_file_name, BackupMetadata};
 use crate::domain::business::Business;
 use crate::domain::customer::{Customer, CustomerFields, CustomerFilter, CustomerListItem};
 use crate::domain::dashboard::DashboardMetrics;
+use crate::domain::export::ExportEntity;
 use crate::domain::invoice::{
     DraftInvoiceInput, InvoiceFilter, InvoiceSummary, InvoiceWithLineItems,
 };
@@ -375,5 +379,64 @@ pub async fn save_invoice_pdf(
 ) -> Result<(), ApplicationError> {
     pdf_use_cases
         .save_invoice_pdf(id, std::path::Path::new(&path))
+        .await
+}
+
+/// The default name the backup save dialog offers (user-flows.md §9).
+#[tauri::command]
+pub fn suggested_backup_file_name() -> String {
+    backup_file_name(chrono::Utc::now().date_naive())
+}
+
+#[tauri::command]
+pub async fn backup_database(
+    backup_use_cases: State<'_, BackupUseCases>,
+    path: String,
+) -> Result<(), ApplicationError> {
+    backup_use_cases
+        .backup_to(std::path::Path::new(&path))
+        .await
+}
+
+/// Reads a `.vbx`'s metadata without unpacking it, so the confirmation dialog
+/// can say what is about to replace the user's data — and so an archive this
+/// build can't read is refused before anything is touched.
+#[tauri::command]
+pub async fn inspect_backup(
+    backup_use_cases: State<'_, BackupUseCases>,
+    path: String,
+) -> Result<BackupMetadata, ApplicationError> {
+    backup_use_cases.inspect_backup(std::path::Path::new(&path))
+}
+
+/// Replaces all local data, then **restarts the app** and therefore never
+/// returns on success. Every repository holds a pool that `restore_from` has
+/// closed, so continuing to run would mean serving a database nothing can
+/// read; a restart is the honest end of this operation, not a convenience.
+#[tauri::command]
+pub async fn restore_backup(
+    app: tauri::AppHandle,
+    backup_use_cases: State<'_, BackupUseCases>,
+    path: String,
+) -> Result<(), ApplicationError> {
+    backup_use_cases
+        .restore_from(std::path::Path::new(&path))
+        .await?;
+    app.restart();
+}
+
+#[tauri::command]
+pub fn suggested_export_file_name(entity: ExportEntity) -> String {
+    entity.suggested_file_name().to_string()
+}
+
+#[tauri::command]
+pub async fn export_data(
+    export_use_cases: State<'_, ExportUseCases>,
+    entity: ExportEntity,
+    path: String,
+) -> Result<(), ApplicationError> {
+    export_use_cases
+        .export_to(entity, std::path::Path::new(&path))
         .await
 }

@@ -2,6 +2,7 @@
 //! implementations here implement the ports defined in
 //! `crate::application::ports`.
 
+pub mod database_file;
 pub mod sqlite_business_repository;
 pub mod sqlite_customer_repository;
 pub mod sqlite_dashboard_repository;

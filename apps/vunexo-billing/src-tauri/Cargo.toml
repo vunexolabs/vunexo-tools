@@ -25,6 +25,10 @@ base64 = "0.22"
 # PNG/JPEG decoding for the business logo.
 printpdf = { version = "0.12", default-features = false, features = ["images", "png", "jpeg", "text_layout"] }
 tauri-plugin-dialog = "2"
+# `.vbx` is a zip archive (database-schema.md §9). Only `deflate` is enabled —
+# the other backends (zstd/bzip2/lzma) would pull C toolchains for no benefit
+# on a file that is mostly an already-compact SQLite page store.
+zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 proptest = "1"

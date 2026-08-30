@@ -187,6 +187,17 @@ export interface TaxRateFields {
 
 export type InvoiceStatus = "DRAFT" | "ISSUED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
 
+/** ui-ux.md §6 — the three CSVs and the one JSON "everything" export. */
+export type ExportEntity = "CUSTOMERS" | "PRODUCTS" | "INVOICES" | "ALL";
+
+/** The `metadata.json` block inside a `.vbx` (database-schema.md §9). */
+export interface BackupMetadata {
+  format_version: number;
+  app_version: string;
+  created_at: string;
+  platform: string;
+}
+
 /** What `probe_business_logo` returns — whether the chosen logo can actually be printed. */
 export type LogoProbe =
   | { status: "OK"; width_px: number; height_px: number }

@@ -2,3 +2,4 @@
 //! JSON/CSV export in a later round.
 
 pub mod file_writer;
+pub mod vbx_archive;

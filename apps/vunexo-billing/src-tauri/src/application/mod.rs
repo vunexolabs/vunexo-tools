@@ -2,10 +2,12 @@
 //! defines itself; never reaches directly into `crate::infrastructure`
 //! (dependency inversion — infrastructure implements the ports defined here).
 
+pub mod backup;
 pub mod business;
 pub mod customers;
 pub mod dashboard;
 pub mod error;
+pub mod export;
 pub mod invoices;
 pub mod payments;
 pub mod pdf;

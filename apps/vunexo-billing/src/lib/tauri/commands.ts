@@ -2,6 +2,7 @@
 // exposed in src-tauri/src/commands/mod.rs.
 import { callCommand } from "./client";
 import type {
+  BackupMetadata,
   Business,
   Customer,
   CustomerFields,
@@ -9,6 +10,7 @@ import type {
   CustomerListItem,
   DashboardMetrics,
   DraftInvoiceInput,
+  ExportEntity,
   InvoiceFilter,
   InvoiceSummary,
   InvoiceWithLineItems,
@@ -204,4 +206,38 @@ export function probeBusinessLogo(path: string): Promise<LogoProbe> {
 /** Writes the invoice PDF to a path already chosen in the OS save dialog. */
 export function saveInvoicePdf(id: number, path: string): Promise<void> {
   return callCommand<void>("save_invoice_pdf", { id, path });
+}
+
+export function suggestedBackupFileName(): Promise<string> {
+  return callCommand<string>("suggested_backup_file_name");
+}
+
+export function backupDatabase(path: string): Promise<void> {
+  return callCommand<void>("backup_database", { path });
+}
+
+/**
+ * Reads a `.vbx`'s metadata without unpacking it, so the confirmation can say
+ * what is about to replace the user's data — and so an archive this build
+ * can't read is refused before anything is touched.
+ */
+export function inspectBackup(path: string): Promise<BackupMetadata> {
+  return callCommand<BackupMetadata>("inspect_backup", { path });
+}
+
+/**
+ * Replaces all local data and **restarts the app**, so this never resolves on
+ * success. Every repository holds a pool the restore has closed; carrying on
+ * would mean serving a database nothing can read.
+ */
+export function restoreBackup(path: string): Promise<void> {
+  return callCommand<void>("restore_backup", { path });
+}
+
+export function suggestedExportFileName(entity: ExportEntity): Promise<string> {
+  return callCommand<string>("suggested_export_file_name", { entity });
+}
+
+export function exportData(entity: ExportEntity, path: string): Promise<void> {
+  return callCommand<void>("export_data", { entity, path });
 }

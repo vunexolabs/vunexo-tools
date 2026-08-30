@@ -9,15 +9,19 @@ use std::sync::Arc;
 
 use tauri::Manager;
 
+use application::backup::BackupUseCases;
 use application::business::BusinessUseCases;
 use application::customers::CustomerUseCases;
 use application::dashboard::DashboardUseCases;
+use application::export::ExportUseCases;
 use application::invoices::InvoiceUseCases;
 use application::payments::PaymentUseCases;
 use application::pdf::PdfUseCases;
+use application::ports::backup_archive::BackupArchive;
 use application::ports::business_repository::BusinessRepository;
 use application::ports::customer_repository::CustomerRepository;
 use application::ports::dashboard_repository::DashboardRepository;
+use application::ports::database_file::DatabaseFile;
 use application::ports::file_writer::FileWriter;
 use application::ports::invoice_number_sequencer::InvoiceNumberSequencer;
 use application::ports::invoice_pdf_renderer::InvoicePdfRenderer;
@@ -30,6 +34,7 @@ use application::ports::transaction::TransactionManager;
 use application::products::ProductUseCases;
 use application::settings::SettingsUseCases;
 use application::tax_rates::TaxRateUseCases;
+use infrastructure::database::database_file::SqliteDatabaseFile;
 use infrastructure::database::sqlite_business_repository::SqliteBusinessRepository;
 use infrastructure::database::sqlite_customer_repository::SqliteCustomerRepository;
 use infrastructure::database::sqlite_dashboard_repository::SqliteDashboardRepository;
@@ -41,6 +46,7 @@ use infrastructure::database::sqlite_settings_repository::SqliteSettingsReposito
 use infrastructure::database::sqlite_tax_rate_repository::SqliteTaxRateRepository;
 use infrastructure::database::transaction::SqlxTransactionManager;
 use infrastructure::filesystem::file_writer::StdFileWriter;
+use infrastructure::filesystem::vbx_archive::VbxArchive;
 use infrastructure::pdf::PrintpdfInvoiceRenderer;
 
 fn main() {
@@ -76,6 +82,9 @@ fn main() {
                 Arc::new(SqliteTaxRateRepository::new(pool.clone()));
             let dashboard_repo: Arc<dyn DashboardRepository> =
                 Arc::new(SqliteDashboardRepository::new(pool.clone()));
+            let database_file: Arc<dyn DatabaseFile> =
+                Arc::new(SqliteDatabaseFile::new(pool.clone(), db_path));
+            let backup_archive: Arc<dyn BackupArchive> = Arc::new(VbxArchive::new());
             let sequencer: Arc<dyn InvoiceNumberSequencer> =
                 Arc::new(SqliteInvoiceNumberSequencer::new(pool));
             let pdf_renderer: Arc<dyn InvoicePdfRenderer> =
@@ -90,7 +99,10 @@ fn main() {
                 customer_repo.clone(),
                 tx_manager.clone(),
             ));
-            app.manage(ProductUseCases::new(product_repo, tx_manager.clone()));
+            app.manage(ProductUseCases::new(
+                product_repo.clone(),
+                tx_manager.clone(),
+            ));
             app.manage(SettingsUseCases::new(
                 settings_repo.clone(),
                 invoice_repo.clone(),
@@ -106,11 +118,32 @@ fn main() {
                 customer_repo.clone(),
                 business_repo.clone(),
                 settings_repo.clone(),
-                payment_repo,
+                payment_repo.clone(),
                 pdf_renderer,
-                file_writer,
+                file_writer.clone(),
             ));
-            app.manage(TaxRateUseCases::new(tax_rate_repo, tx_manager.clone()));
+            app.manage(TaxRateUseCases::new(
+                tax_rate_repo.clone(),
+                tx_manager.clone(),
+            ));
+            app.manage(BackupUseCases::new(
+                database_file,
+                backup_archive,
+                business_repo.clone(),
+                data_dir,
+                env!("CARGO_PKG_VERSION").to_string(),
+                std::env::consts::OS.to_string(),
+            ));
+            app.manage(ExportUseCases::new(
+                business_repo.clone(),
+                customer_repo.clone(),
+                product_repo.clone(),
+                invoice_repo.clone(),
+                payment_repo.clone(),
+                settings_repo.clone(),
+                tax_rate_repo,
+                file_writer.clone(),
+            ));
             app.manage(DashboardUseCases::new(dashboard_repo));
             app.manage(InvoiceUseCases::new(
                 invoice_repo,
@@ -164,6 +197,12 @@ fn main() {
             commands::get_dashboard_metrics,
             commands::render_invoice_pdf,
             commands::probe_business_logo,
+            commands::suggested_backup_file_name,
+            commands::backup_database,
+            commands::inspect_backup,
+            commands::restore_backup,
+            commands::suggested_export_file_name,
+            commands::export_data,
             commands::save_invoice_pdf,
         ])
         .run(tauri::generate_context!())
