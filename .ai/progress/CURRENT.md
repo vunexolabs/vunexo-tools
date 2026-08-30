@@ -22,9 +22,9 @@ Last commit is `147ac93`. Run `git status` before assuming the tree is clean.
 | Slice | Backend | Frontend | Tests |
 |---|---|---|---|
 | Business, Customers, Products | ✅ full CRUD | ✅ CRUD screens, archive/delete via `has_invoices` | manually verified by user |
-| Invoices (draft/issue/cancel/duplicate/list) | ✅ | ✅ Invoice Editor + list | integration tests, real SQLite |
+| Invoices (draft/issue/cancel/duplicate/list) | ✅ | ✅ Invoice Editor + list, including per-line discount type/value | integration tests, real SQLite |
 | Payments | ✅ record/update/delete, status auto-recalc | ✅ `PaymentPanel`, wired into editor + list | 6 integration tests |
-| Dashboard | ✅ `DashboardRepository`, all SQL-aggregated | ✅ default landing screen, recent-invoices click-through | 1 integration test |
+| Dashboard | ✅ `DashboardRepository`, all SQL-aggregated | ✅ default landing screen, recent-invoices + Overdue-card click-through | 1 integration test |
 | Settings screen | ✅ | ✅ 3 tabs: Business Profile / Tax Rates / Invoicing | n/a |
 | Tax Rates CRUD | ✅ create/update/list (no delete, per spec) | ✅ inline-edit table; wired into Product form + invoice line items | 3 integration tests |
 | EditIssuedInvoice | ✅ `update_issued`, re-snapshots fresh at every save | ✅ Issued/PartiallyPaid/Paid fully editable, Save Changes/Duplicate/Cancel in editor | 3 integration tests |
@@ -56,8 +56,8 @@ Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 ## Known gaps (deliberate, not oversights)
 
 - **Only India's GST tax model is implemented.** Currency display is dynamic per-country now, but tax regime logic is India-specific and locked as V1 scope. **User confirmed (2026-08-30): fine for now — multi-country tax support is an explicit future-version item. Don't build it speculatively, but don't design anything that'd make it harder later either.**
-- Line-level discounts: engine supports them, editor UI only exposes invoice-level discount.
-- Dashboard metric cards aren't clickable-through to a filtered Invoices List (recent-invoices rows are). Needs `InvoiceFilter` to support a derived `OVERDUE` pseudo-status plus lifting filter state out of `InvoicesList`.
+- ~~Line-level discounts: engine supports them, editor UI only exposes invoice-level discount.~~ Fixed 2026-08-30 (session 7) — per-line discount type/value now editable in the Invoice Editor's line-item table.
+- ~~Dashboard metric cards aren't clickable-through to a filtered Invoices List.~~ Fixed 2026-08-30 (session 7), Overdue card only — see the daily file for why the other four cards deliberately stay non-clickable.
 - The PDF prints one neutral `Tax` line outside India rather than a CGST/SGST/IGST split — same India-only constraint as above, and the Invoice Editor's on-screen totals now match it.
 - Restore has full test coverage, now including a round-trip against a real-data-shaped copy (session 6), but still hasn't been clicked through in the running app — `app.restart()` specifically can only be confirmed by hand.
 
@@ -67,6 +67,7 @@ Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 2. ~~Backup/restore + export~~ — done 2026-08-30 (session 3).
 3. ~~Make `business.logo_path` app-managed~~ — done 2026-08-30 (session 4).
 4. ~~PDF generation audit against real data~~ — done 2026-08-30 (session 5), passed. ~~Restore audit against real data~~ — done 2026-08-30 (session 6), passed. Only `app.restart()` itself (the OS-level relaunch) remains unconfirmed — that needs a human click-through in the running app, see the note in "Known gaps" below.
+5. ~~Fix the two actionable known gaps~~ — done 2026-08-30 (session 7): line-level discount UI, Dashboard Overdue-card click-through. The other two "known gaps" (multi-country tax, the PDF's neutral non-India tax line) are locked out-of-scope, not bugs — left as-is on purpose. **Not yet clicked through in the running app** — `typecheck`/`lint`/`build` pass, but nobody has looked at the actual rendered UI yet.
 
 ## Verification commands (all of these, every slice)
 
@@ -84,4 +85,4 @@ The user's `pnpm tauri dev` session tends to stay running for an entire work ses
 
 - `2026-08-28.md` — Rounds 1–6 locked; Business/Customers/Products CRUD + calculation engine implemented.
 - `2026-08-29.md` — Invoices vertical slice (draft/issue/cancel/duplicate/list).
-- `2026-08-30.md` — six sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects. Session 6: audited backup/restore against a real-data-shaped copy — passed, no defects.
+- `2026-08-30.md` — seven sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects. Session 6: audited backup/restore against a real-data-shaped copy — passed, no defects. Session 7: fixed the two actionable known gaps (line-level discount UI, Dashboard Overdue click-through).

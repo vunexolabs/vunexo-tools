@@ -8,15 +8,20 @@ import { useDashboard } from "../../hooks/useDashboard";
  * paid/overdue metrics plus a recent-invoices list. Every recent-invoice
  * row is clickable through to the invoice detail per user-flows.md §8.
  *
- * Scope trim: the metric cards themselves aren't yet clickable through to a
- * filtered Invoices List — `InvoiceFilter` only supports a single stored
- * `status`, not the derived `OVERDUE` pseudo-status user-flows.md/ui-ux.md
- * describe, and the Invoices List keeps its filter state locally rather
- * than lifted into `App`. Wiring that up is real, separate work, not done
- * here to avoid a half-built filter concept; the recent-invoices
- * click-through below is fully implemented.
+ * Only the Overdue card is clickable through to a filtered Invoices List:
+ * it's the one metric with an exact status-based equivalent (the same
+ * `is_overdue` flag the Invoices List's "Overdue" filter already uses). The
+ * sales/outstanding/paid cards are date- or multi-status-scoped sums with no
+ * matching `InvoiceFilter` value, so linking them would land on a list that
+ * doesn't actually match the number shown.
  */
-export function Dashboard({ onOpenInvoice }: { onOpenInvoice: (id: number) => void }) {
+export function Dashboard({
+  onOpenInvoice,
+  onOpenOverdueInvoices,
+}: {
+  onOpenInvoice: (id: number) => void;
+  onOpenOverdueInvoices: () => void;
+}) {
   const { symbol, formatMinor } = useCurrency();
   const { metrics, error } = useDashboard();
 
@@ -49,12 +54,15 @@ export function Dashboard({ onOpenInvoice }: { onOpenInvoice: (id: number) => vo
             <p className="mt-1 text-lg font-semibold">{symbol}{formatMinor(c.value)}</p>
           </div>
         ))}
-        <div className="rounded border border-slate-700 bg-slate-900 p-4">
+        <button
+          onClick={onOpenOverdueInvoices}
+          className="rounded border border-slate-700 bg-slate-900 p-4 text-left hover:bg-slate-800"
+        >
           <p className="text-xs text-slate-400">Overdue</p>
           <p className="mt-1 text-lg font-semibold text-red-400">
             {metrics.overdue.count} · {symbol}{formatMinor(metrics.overdue.total_minor)}
           </p>
-        </div>
+        </button>
       </div>
 
       <div>

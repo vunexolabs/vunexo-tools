@@ -3,7 +3,7 @@ import { BusinessSetup } from "../features/settings/BusinessSetup";
 import { CustomersList } from "../features/customers/CustomersList";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { InvoiceEditor } from "../features/invoices/InvoiceEditor";
-import { InvoicesList } from "../features/invoices/InvoicesList";
+import { InvoicesList, type FilterOption } from "../features/invoices/InvoicesList";
 import { ProductsList } from "../features/products/ProductsList";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { useBusiness } from "../hooks/useBusiness";
@@ -27,6 +27,7 @@ export function App() {
   const { business, create } = useBusiness();
   const [section, setSection] = useState<Section>("dashboard");
   const [openInvoiceId, setOpenInvoiceId] = useState<number | null>(null);
+  const [invoiceFilter, setInvoiceFilter] = useState<FilterOption>(null);
 
   if (business === undefined) {
     return (
@@ -43,6 +44,7 @@ export function App() {
   const goToSection = (s: Section) => {
     setSection(s);
     setOpenInvoiceId(null);
+    setInvoiceFilter(null);
   };
 
   return (
@@ -73,11 +75,16 @@ export function App() {
               setSection("invoices");
               setOpenInvoiceId(id);
             }}
+            onOpenOverdueInvoices={() => {
+              setSection("invoices");
+              setOpenInvoiceId(null);
+              setInvoiceFilter("OVERDUE");
+            }}
           />
         )}
         {section === "invoices" &&
           (openInvoiceId === null ? (
-            <InvoicesList onOpen={setOpenInvoiceId} />
+            <InvoicesList onOpen={setOpenInvoiceId} filter={invoiceFilter} onFilterChange={setInvoiceFilter} />
           ) : (
             <InvoiceEditor invoiceId={openInvoiceId} onBack={() => setOpenInvoiceId(null)} onOpenInvoice={setOpenInvoiceId} />
           ))}

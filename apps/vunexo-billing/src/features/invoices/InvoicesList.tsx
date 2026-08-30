@@ -10,7 +10,7 @@ import { useInvoices } from "../../hooks/useInvoices";
 import { useInvoicePdf } from "../../hooks/useInvoicePdf";
 import type { InvoiceStatus } from "../../lib/tauri/types";
 
-type FilterOption = InvoiceStatus | "OVERDUE" | null;
+export type FilterOption = InvoiceStatus | "OVERDUE" | null;
 
 const STATUS_FILTERS: { label: string; value: FilterOption }[] = [
   { label: "All", value: null },
@@ -28,10 +28,20 @@ const STATUS_FILTERS: { label: string; value: FilterOption }[] = [
  * stored `InvoiceFilter.status` value the backend can query by, so it's
  * filtered client-side over the already-computed `is_overdue` flag every
  * row already carries, rather than added as a fake stored status.
+ *
+ * `filter`/`onFilterChange` are lifted into `App` (rather than local state)
+ * so the Dashboard's Overdue card can land here pre-filtered.
  */
-export function InvoicesList({ onOpen }: { onOpen: (id: number) => void }) {
+export function InvoicesList({
+  onOpen,
+  filter,
+  onFilterChange,
+}: {
+  onOpen: (id: number) => void;
+  filter: FilterOption;
+  onFilterChange: (filter: FilterOption) => void;
+}) {
   const { symbol, formatMinor } = useCurrency();
-  const [filter, setFilter] = useState<FilterOption>(null);
   const queryStatus = filter === "OVERDUE" ? null : filter;
   const { invoices: fetchedInvoices, error, cancel, remove, duplicate, reload } = useInvoices(queryStatus);
   const invoices = filter === "OVERDUE" ? (fetchedInvoices?.filter((i) => i.is_overdue) ?? null) : fetchedInvoices;
@@ -95,7 +105,7 @@ export function InvoicesList({ onOpen }: { onOpen: (id: number) => void }) {
         {STATUS_FILTERS.map((f) => (
           <button
             key={f.label}
-            onClick={() => setFilter(f.value)}
+            onClick={() => onFilterChange(f.value)}
             className={`rounded px-2 py-1 ${filter === f.value ? "bg-slate-800" : "text-slate-400 hover:bg-slate-900"}`}
           >
             {f.label}

@@ -51,11 +51,6 @@ function resolveTaxRate(taxRates: TaxRate[], taxRateId: number | null): { taxRat
  * an issued invoice" rule) via `edit_issued_invoice`, which re-snapshots
  * customer/business fresh at every save; only `CANCELLED` is read-only.
  *
- * Scope simplification versus the full spec: line-level discounts aren't
- * exposed in this editor (only the invoice-level discount) — the calculation
- * engine already supports them (calculation-engine.md §4 Step 2), this is a
- * UI-only trim to keep the editor small.
- *
  * Totals are still never computed client-side (application-architecture.md
  * §4a) — every line/discount edit debounces a real save call and re-renders
  * whatever the backend returns, so it *feels* live without moving the
@@ -71,6 +66,8 @@ interface EditableLine {
   priceStr: string;
   taxRateId: number | null;
   taxStr: string;
+  lineDiscountIsPercentage: boolean;
+  lineDiscountStr: string;
 }
 
 let keyCounter = 0;
@@ -92,6 +89,13 @@ function toEditableLine(li: InvoiceWithLineItems["line_items"][number], key: str
     priceStr: formatMinor(li.unit_price_minor),
     taxRateId: li.tax_rate_id,
     taxStr: formatBasisPointsAsPercent(li.tax_rate_basis_points),
+    lineDiscountIsPercentage: li.line_discount_type === "PERCENTAGE",
+    lineDiscountStr:
+      li.line_discount_value === null
+        ? ""
+        : li.line_discount_type === "PERCENTAGE"
+          ? formatBasisPointsAsPercent(li.line_discount_value)
+          : formatMinor(li.line_discount_value),
   };
 }
 
@@ -215,8 +219,13 @@ export function InvoiceEditor({
       unit: l.unit,
       quantity_thousandths: parseQuantityToThousandths(l.quantityStr),
       unit_price_minor: parseToMinor(l.priceStr),
-      line_discount_type: null,
-      line_discount_value: null,
+      line_discount_type: l.lineDiscountStr.trim() === "" ? null : l.lineDiscountIsPercentage ? "PERCENTAGE" : "AMOUNT",
+      line_discount_value:
+        l.lineDiscountStr.trim() === ""
+          ? null
+          : l.lineDiscountIsPercentage
+            ? parsePercentToBasisPoints(l.lineDiscountStr)
+            : parseToMinor(l.lineDiscountStr),
       tax_rate_id: l.taxRateId,
       tax_rate_basis_points: parsePercentToBasisPoints(l.taxStr),
     })),
@@ -298,6 +307,8 @@ export function InvoiceEditor({
         unit: "",
         quantityStr: "1",
         priceStr: "0",
+        lineDiscountIsPercentage: false,
+        lineDiscountStr: "",
         ...resolveTaxRate(taxRates, defaultTaxRateId),
       },
     ]);
@@ -532,6 +543,7 @@ export function InvoiceEditor({
               <th className="pb-2">Qty</th>
               <th className="pb-2">Rate ({symbol})</th>
               <th className="pb-2">Tax %</th>
+              <th className="pb-2">Discount</th>
               {isEditable && <th className="pb-2"></th>}
             </tr>
           </thead>
@@ -614,6 +626,32 @@ export function InvoiceEditor({
                     </div>
                   ) : (
                     `${l.taxStr}%`
+                  )}
+                </td>
+                <td className="py-2 pr-2">
+                  {isEditable ? (
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={l.lineDiscountIsPercentage ? "PERCENTAGE" : "AMOUNT"}
+                        onChange={(e) => updateLine(l.key, { lineDiscountIsPercentage: e.target.value === "PERCENTAGE" })}
+                        className="rounded border border-slate-700 bg-slate-950 px-1 py-1 text-xs"
+                      >
+                        <option value="AMOUNT">{symbol}</option>
+                        <option value="PERCENTAGE">%</option>
+                      </select>
+                      <input
+                        value={l.lineDiscountStr}
+                        onChange={(e) => updateLine(l.key, { lineDiscountStr: e.target.value })}
+                        placeholder="0"
+                        className="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1"
+                      />
+                    </div>
+                  ) : l.lineDiscountStr === "" ? (
+                    "—"
+                  ) : l.lineDiscountIsPercentage ? (
+                    `${l.lineDiscountStr}%`
+                  ) : (
+                    `${symbol}${l.lineDiscountStr}`
                   )}
                 </td>
                 {isEditable && (
