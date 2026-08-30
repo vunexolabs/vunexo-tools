@@ -6,6 +6,9 @@ on:
     tags:
       - "app-v*"
 
+permissions:
+  contents: write
+
 jobs:
   release:
     name: Build (${{ matrix.platform }})
