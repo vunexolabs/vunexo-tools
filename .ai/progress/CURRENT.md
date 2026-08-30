@@ -59,14 +59,14 @@ Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 - Line-level discounts: engine supports them, editor UI only exposes invoice-level discount.
 - Dashboard metric cards aren't clickable-through to a filtered Invoices List (recent-invoices rows are). Needs `InvoiceFilter` to support a derived `OVERDUE` pseudo-status plus lifting filter state out of `InvoicesList`.
 - The PDF prints one neutral `Tax` line outside India rather than a CGST/SGST/IGST split — same India-only constraint as above, and the Invoice Editor's on-screen totals now match it.
-- Restore has full test coverage but hasn't been clicked through in the running app — `app.restart()` specifically can only be confirmed by hand.
+- Restore has full test coverage, now including a round-trip against a real-data-shaped copy (session 6), but still hasn't been clicked through in the running app — `app.restart()` specifically can only be confirmed by hand.
 
 ## Next up (agreed order)
 
 1. ~~PDF generation~~ — done 2026-08-30 (session 2). See the daily file for the library choice, the layering, and the font trade-off.
 2. ~~Backup/restore + export~~ — done 2026-08-30 (session 3).
 3. ~~Make `business.logo_path` app-managed~~ — done 2026-08-30 (session 4).
-4. ~~PDF generation audit against real data~~ — done 2026-08-30 (session 5), and it passed. Restore is still unaudited against real data — that half of item 4 is still open.
+4. ~~PDF generation audit against real data~~ — done 2026-08-30 (session 5), passed. ~~Restore audit against real data~~ — done 2026-08-30 (session 6), passed. Only `app.restart()` itself (the OS-level relaunch) remains unconfirmed — that needs a human click-through in the running app, see the note in "Known gaps" below.
 
 ## Verification commands (all of these, every slice)
 
@@ -84,4 +84,4 @@ The user's `pnpm tauri dev` session tends to stay running for an entire work ses
 
 - `2026-08-28.md` — Rounds 1–6 locked; Business/Customers/Products CRUD + calculation engine implemented.
 - `2026-08-29.md` — Invoices vertical slice (draft/issue/cancel/duplicate/list).
-- `2026-08-30.md` — five sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects.
+- `2026-08-30.md` — six sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects. Session 6: audited backup/restore against a real-data-shaped copy — passed, no defects.
