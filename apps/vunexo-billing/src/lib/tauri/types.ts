@@ -2,6 +2,9 @@
 // including their literal (snake_case) JSON field names — see
 // src-tauri/src/domain/business.rs and domain/customer.rs.
 
+/** V2 — user-flows-v2.md §1. `IN_GST` is the only regime until Round 6/7 names a second one. */
+export type TaxRegimeCode = "IN_GST" | "VAT_STANDARD";
+
 export interface Business {
   name: string;
   logo_path: string | null;
@@ -11,6 +14,7 @@ export interface Business {
   gstin: string | null;
   bank_details: string | null;
   upi_id: string | null;
+  tax_regime_code: TaxRegimeCode;
 }
 
 export type CustomerStatus = "ACTIVE" | "ARCHIVED";
@@ -163,6 +167,8 @@ export interface Settings {
   invoice_number_format: string;
   default_due_days: number;
   default_tax_rate_id: number | null;
+  quote_number_format: string;
+  payment_reminder_template: string | null;
 }
 
 export interface SettingsFields {
@@ -172,6 +178,8 @@ export interface SettingsFields {
   invoice_number_format: string;
   default_due_days: number;
   default_tax_rate_id: number | null;
+  quote_number_format: string;
+  payment_reminder_template: string | null;
 }
 
 export interface TaxRate {
@@ -288,6 +296,8 @@ export interface Invoice {
   issued_at: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
+  source_quote_id: number | null;
+  tax_regime_snapshot: TaxRegimeCode | null;
 }
 
 export interface InvoiceWithLineItems extends Invoice {
@@ -386,4 +396,150 @@ export function errorMessage(err: unknown): string {
     return err.kind === "infrastructure" ? "Something went wrong. Your data is safe." : err.message;
   }
   return "Something went wrong. Your data is safe.";
+}
+
+// --- V2: Quotes (user-flows-v2.md §2/§3, ui-ux-v2.md §4) ---
+
+export type QuoteStatus = "DRAFT" | "ISSUED" | "ACCEPTED" | "DECLINED" | "CONVERTED" | "CANCELLED";
+
+export interface QuoteLineItem {
+  id: number;
+  product_id: number | null;
+  description: string;
+  unit: string;
+  quantity_thousandths: number;
+  unit_price_minor: number;
+  line_discount_type: DiscountType | null;
+  line_discount_value: number | null;
+  tax_rate_id: number | null;
+  tax_rate_basis_points: number;
+  line_subtotal_minor: number;
+  line_discount_amount_minor: number;
+  quote_discount_amount_minor: number;
+  taxable_amount_minor: number;
+  line_tax_minor: number;
+  line_total_minor: number;
+  sort_order: number;
+}
+
+export interface QuoteLineItemInput {
+  product_id: number | null;
+  description: string;
+  unit: string;
+  quantity_thousandths: number;
+  unit_price_minor: number;
+  line_discount_type: DiscountType | null;
+  line_discount_value: number | null;
+  tax_rate_id: number | null;
+  tax_rate_basis_points: number;
+}
+
+export interface Quote {
+  id: number;
+  quote_number: string | null;
+  status: QuoteStatus;
+  customer_id: number | null;
+  customer_snapshot_name: string | null;
+  customer_snapshot_phone: string | null;
+  customer_snapshot_email: string | null;
+  customer_snapshot_address: string | null;
+  customer_snapshot_gstin: string | null;
+  business_snapshot_name: string | null;
+  business_snapshot_address: string | null;
+  business_snapshot_gstin: string | null;
+  business_snapshot_phone: string | null;
+  business_snapshot_email: string | null;
+  business_snapshot_bank_details: string | null;
+  business_snapshot_upi_id: string | null;
+  business_snapshot_logo_path: string | null;
+  tax_regime_snapshot: TaxRegimeCode | null;
+  is_interstate: boolean;
+  quote_date: string;
+  valid_until: string | null;
+  notes: string | null;
+  terms: string | null;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+  subtotal_minor: number;
+  discount_amount_minor: number;
+  tax_amount_minor: number;
+  total_minor: number;
+  issued_at: string | null;
+  accepted_at: string | null;
+  declined_at: string | null;
+  converted_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+}
+
+export interface QuoteWithLineItems extends Quote {
+  line_items: QuoteLineItem[];
+}
+
+export interface QuoteSummary {
+  id: number;
+  quote_number: string | null;
+  status: QuoteStatus;
+  customer_name: string | null;
+  quote_date: string;
+  valid_until: string | null;
+  total_minor: number;
+  is_expired: boolean;
+}
+
+export interface DraftQuoteInput {
+  customer_id: number | null;
+  quote_date: string;
+  valid_until: string | null;
+  notes: string | null;
+  terms: string | null;
+  is_interstate: boolean;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+  line_items: QuoteLineItemInput[];
+}
+
+export interface QuoteFilter {
+  status: QuoteStatus | null;
+}
+
+// --- V2: Statements (user-flows-v2.md §4, ui-ux-v2.md §5) ---
+
+export type StatementEntryKind = "INVOICE" | "PAYMENT";
+
+export interface StatementEntry {
+  date: string;
+  kind: StatementEntryKind;
+  reference: string | null;
+  amount_minor: number;
+}
+
+export interface StatementResult {
+  opening_balance_minor: number;
+  entries: StatementEntry[];
+  closing_balance_minor: number;
+}
+
+// --- V2: Reports (user-flows-v2.md §5, ui-ux-v2.md §6) ---
+
+export type SalesGrouping = "NONE" | "PRODUCT" | "CUSTOMER";
+
+export interface SalesSummaryRow {
+  label: string;
+  sales_minor: number;
+}
+
+export interface SalesSummaryResult {
+  total_sales_minor: number;
+  rows: SalesSummaryRow[];
+}
+
+export interface TaxSummaryRow {
+  tax_regime: TaxRegimeCode;
+  tax_amount_minor: number;
+}
+
+export interface TaxSummaryResult {
+  total_tax_minor: number;
+  by_regime: TaxSummaryRow[];
 }

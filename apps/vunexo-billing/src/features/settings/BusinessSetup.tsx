@@ -11,6 +11,7 @@ const EMPTY: Business = {
   gstin: null,
   bank_details: null,
   upi_id: null,
+  tax_regime_code: "IN_GST",
 };
 
 /**

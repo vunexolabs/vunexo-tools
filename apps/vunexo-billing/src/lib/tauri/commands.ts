@@ -10,6 +10,7 @@ import type {
   CustomerListItem,
   DashboardMetrics,
   DraftInvoiceInput,
+  DraftQuoteInput,
   ExportEntity,
   InvoiceFilter,
   InvoiceSummary,
@@ -22,11 +23,18 @@ import type {
   ProductFields,
   ProductFilter,
   ProductListItem,
+  QuoteFilter,
+  QuoteSummary,
+  QuoteWithLineItems,
   RenderedInvoicePdf,
+  SalesGrouping,
+  SalesSummaryResult,
   Settings,
   SettingsFields,
+  StatementResult,
   TaxRate,
   TaxRateFields,
+  TaxSummaryResult,
 } from "./types";
 
 /** Round 1 technical spike: proves the React -> Tauri -> Rust round trip. */
@@ -150,6 +158,55 @@ export function listInvoices(filter: InvoiceFilter): Promise<InvoiceSummary[]> {
   return callCommand<InvoiceSummary[]>("list_invoices", { filter });
 }
 
+export function previewNextQuoteNumber(): Promise<string> {
+  return callCommand<string>("preview_next_quote_number");
+}
+
+export function createDraftQuote(input: DraftQuoteInput): Promise<QuoteWithLineItems> {
+  return callCommand<QuoteWithLineItems>("create_draft_quote", { input });
+}
+
+export function updateDraftQuote(id: number, input: DraftQuoteInput): Promise<QuoteWithLineItems> {
+  return callCommand<QuoteWithLineItems>("update_draft_quote", { id, input });
+}
+
+export function issueQuote(id: number): Promise<QuoteWithLineItems> {
+  return callCommand<QuoteWithLineItems>("issue_quote", { id });
+}
+
+export function acceptQuote(id: number): Promise<void> {
+  return callCommand<void>("accept_quote", { id });
+}
+
+export function declineQuote(id: number): Promise<void> {
+  return callCommand<void>("decline_quote", { id });
+}
+
+export function cancelQuote(id: number, reason: string | null): Promise<void> {
+  return callCommand<void>("cancel_quote", { id, reason });
+}
+
+/** application-architecture-v2.md §4c — returns the resulting Draft invoice. */
+export function convertQuoteToInvoice(id: number): Promise<InvoiceWithLineItems> {
+  return callCommand<InvoiceWithLineItems>("convert_quote_to_invoice", { id });
+}
+
+export function duplicateQuote(id: number): Promise<QuoteWithLineItems> {
+  return callCommand<QuoteWithLineItems>("duplicate_quote", { id });
+}
+
+export function deleteDraftQuote(id: number): Promise<void> {
+  return callCommand<void>("delete_draft_quote", { id });
+}
+
+export function getQuote(id: number): Promise<QuoteWithLineItems> {
+  return callCommand<QuoteWithLineItems>("get_quote", { id });
+}
+
+export function listQuotes(filter: QuoteFilter): Promise<QuoteSummary[]> {
+  return callCommand<QuoteSummary[]>("list_quotes", { filter });
+}
+
 export function recordPayment(payment: NewPayment): Promise<Payment> {
   return callCommand<Payment>("record_payment", { payment });
 }
@@ -240,4 +297,32 @@ export function suggestedExportFileName(entity: ExportEntity): Promise<string> {
 
 export function exportData(entity: ExportEntity, path: string): Promise<void> {
   return callCommand<void>("export_data", { entity, path });
+}
+
+export function generateCustomerStatement(
+  customerId: number,
+  rangeStart: string,
+  rangeEnd: string,
+): Promise<StatementResult> {
+  return callCommand<StatementResult>("generate_customer_statement", {
+    customerId,
+    rangeStart,
+    rangeEnd,
+  });
+}
+
+export function generateSalesReport(
+  rangeStart: string,
+  rangeEnd: string,
+  groupBy: SalesGrouping,
+): Promise<SalesSummaryResult> {
+  return callCommand<SalesSummaryResult>("generate_sales_report", { rangeStart, rangeEnd, groupBy });
+}
+
+export function generateTaxSummaryReport(rangeStart: string, rangeEnd: string): Promise<TaxSummaryResult> {
+  return callCommand<TaxSummaryResult>("generate_tax_summary_report", { rangeStart, rangeEnd });
+}
+
+export function generateReminderMessage(invoiceId: number): Promise<string> {
+  return callCommand<string>("generate_reminder_message", { invoiceId });
 }

@@ -5,29 +5,37 @@ import { Dashboard } from "../features/dashboard/Dashboard";
 import { InvoiceEditor } from "../features/invoices/InvoiceEditor";
 import { InvoicesList, type FilterOption } from "../features/invoices/InvoicesList";
 import { ProductsList } from "../features/products/ProductsList";
+import { QuoteEditor } from "../features/quotes/QuoteEditor";
+import { QuotesList } from "../features/quotes/QuotesList";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { useBusiness } from "../hooks/useBusiness";
 
-type Section = "dashboard" | "invoices" | "customers" | "products" | "settings";
+// ui-ux-v2.md §2 — Quotes is a new top-level section; Reports is also
+// locked as one, but its screens aren't built yet (Round 7 slice not
+// started), so it isn't added to this list until there's something behind
+// it to navigate to.
+type Section = "dashboard" | "invoices" | "quotes" | "customers" | "products" | "settings";
 
 const SECTIONS: { id: Section; label: string; implemented: boolean }[] = [
   { id: "dashboard", label: "Dashboard", implemented: true },
   { id: "invoices", label: "Invoices", implemented: true },
+  { id: "quotes", label: "Quotes", implemented: true },
   { id: "customers", label: "Customers", implemented: true },
   { id: "products", label: "Products", implemented: true },
   { id: "settings", label: "Settings", implemented: true },
 ];
 
 /**
- * ui-ux.md §2 — five top-level sections, flat, no nested menus. Business
- * Setup is a full-screen gate shown instead of the shell when no business
- * profile exists yet (user-flows.md §1), not a sidebar destination.
+ * ui-ux.md §2 / ui-ux-v2.md §2 — top-level sections, flat, no nested menus.
+ * Business Setup is a full-screen gate shown instead of the shell when no
+ * business profile exists yet (user-flows.md §1), not a sidebar destination.
  */
 export function App() {
   const { business, create } = useBusiness();
   const [section, setSection] = useState<Section>("dashboard");
   const [openInvoiceId, setOpenInvoiceId] = useState<number | null>(null);
   const [invoiceFilter, setInvoiceFilter] = useState<FilterOption>(null);
+  const [openQuoteId, setOpenQuoteId] = useState<number | null>(null);
 
   if (business === undefined) {
     return (
@@ -45,6 +53,7 @@ export function App() {
     setSection(s);
     setOpenInvoiceId(null);
     setInvoiceFilter(null);
+    setOpenQuoteId(null);
   };
 
   return (
@@ -87,6 +96,21 @@ export function App() {
             <InvoicesList onOpen={setOpenInvoiceId} filter={invoiceFilter} onFilterChange={setInvoiceFilter} />
           ) : (
             <InvoiceEditor invoiceId={openInvoiceId} onBack={() => setOpenInvoiceId(null)} onOpenInvoice={setOpenInvoiceId} />
+          ))}
+        {section === "quotes" &&
+          (openQuoteId === null ? (
+            <QuotesList onOpen={setOpenQuoteId} />
+          ) : (
+            <QuoteEditor
+              quoteId={openQuoteId}
+              onBack={() => setOpenQuoteId(null)}
+              onOpenQuote={setOpenQuoteId}
+              onConverted={(invoiceId) => {
+                setSection("invoices");
+                setOpenQuoteId(null);
+                setOpenInvoiceId(invoiceId);
+              }}
+            />
           ))}
         {section === "customers" && <CustomersList />}
         {section === "products" && <ProductsList />}
