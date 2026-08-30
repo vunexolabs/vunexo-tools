@@ -66,7 +66,7 @@ Backend: 114 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 1. ~~PDF generation~~ — done 2026-08-30 (session 2). See the daily file for the library choice, the layering, and the font trade-off.
 2. ~~Backup/restore + export~~ — done 2026-08-30 (session 3).
 3. ~~Make `business.logo_path` app-managed~~ — done 2026-08-30 (session 4).
-4. Another audit pass, same method as 2026-08-30's — the PDF template and the restore flow have only been checked against tests and generated samples, not against a real business's data on a second machine.
+4. ~~PDF generation audit against real data~~ — done 2026-08-30 (session 5), and it passed. Restore is still unaudited against real data — that half of item 4 is still open.
 
 ## Verification commands (all of these, every slice)
 
@@ -84,4 +84,4 @@ The user's `pnpm tauri dev` session tends to stay running for an entire work ses
 
 - `2026-08-28.md` — Rounds 1–6 locked; Business/Customers/Products CRUD + calculation engine implemented.
 - `2026-08-29.md` — Invoices vertical slice (draft/issue/cancel/duplicate/list).
-- `2026-08-30.md` — two sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine.
+- `2026-08-30.md` — five sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects.
