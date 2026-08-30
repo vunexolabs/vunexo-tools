@@ -26,11 +26,14 @@ fn settings_from_row(row: &sqlx::sqlite::SqliteRow) -> Settings {
         invoice_number_format: row.get("invoice_number_format"),
         default_due_days: row.get("default_due_days"),
         default_tax_rate_id: row.get("default_tax_rate_id"),
+        quote_number_format: row.get("quote_number_format"),
+        payment_reminder_template: row.get("payment_reminder_template"),
     }
 }
 
 const SELECT_COLUMNS: &str =
-    "country_code, currency_code, date_format, invoice_number_format, default_due_days, default_tax_rate_id";
+    "country_code, currency_code, date_format, invoice_number_format, default_due_days, default_tax_rate_id, \
+     quote_number_format, payment_reminder_template";
 
 #[async_trait]
 impl SettingsRepository for SqliteSettingsRepository {
@@ -52,6 +55,7 @@ impl SettingsRepository for SqliteSettingsRepository {
         sqlx::query(
             "UPDATE settings SET country_code = ?, currency_code = ?, date_format = ?, \
              invoice_number_format = ?, default_due_days = ?, default_tax_rate_id = ?, \
+             quote_number_format = ?, payment_reminder_template = ?, \
              updated_at = CURRENT_TIMESTAMP WHERE id = 1",
         )
         .bind(&fields.country_code)
@@ -60,6 +64,8 @@ impl SettingsRepository for SqliteSettingsRepository {
         .bind(&fields.invoice_number_format)
         .bind(fields.default_due_days)
         .bind(fields.default_tax_rate_id)
+        .bind(&fields.quote_number_format)
+        .bind(&fields.payment_reminder_template)
         .execute(&mut **conn)
         .await?;
 

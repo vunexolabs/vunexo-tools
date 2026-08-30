@@ -10,6 +10,8 @@ pub mod sqlite_invoice_number_sequencer;
 pub mod sqlite_invoice_repository;
 pub mod sqlite_payment_repository;
 pub mod sqlite_product_repository;
+pub mod sqlite_quote_number_sequencer;
+pub mod sqlite_quote_repository;
 pub mod sqlite_settings_repository;
 pub mod sqlite_tax_rate_repository;
 pub mod transaction;

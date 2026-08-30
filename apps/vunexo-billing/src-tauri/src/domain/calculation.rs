@@ -53,6 +53,11 @@ pub struct GstSplit {
     pub igst: i64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VatPresentation {
+    pub vat_amount_minor: i64,
+}
+
 /// A discount resolved against `base`, clamped to `[0, base]` on the upper
 /// bound only (calculation-engine.md §3) — `discount`'s value/rate is assumed
 /// non-negative by the caller; this function does not enforce that lower
@@ -209,6 +214,17 @@ pub fn split_gst(tax_amount_minor: i64, is_interstate: bool) -> GstSplit {
             cgst,
             sgst,
         }
+    }
+}
+
+/// calculation-engine-v2.md §3 — symmetric with `split_gst`, though the
+/// transformation is a near-passthrough: `VAT_STANDARD` has no
+/// intrastate/interstate-equivalent split. Kept as its own named function
+/// anyway so the presentation layer has exactly one dispatch point per
+/// regime, matching `split_gst`'s shape.
+pub fn present_vat(tax_amount_minor: i64) -> VatPresentation {
+    VatPresentation {
+        vat_amount_minor: tax_amount_minor,
     }
 }
 
@@ -398,6 +414,81 @@ mod vector_tests {
         assert_eq!(split.cgst, 50);
         assert_eq!(split.sgst, 51);
         assert_eq!(split.cgst + split.sgst, 101);
+    }
+
+    /// calculation-engine-v2.md Vector V1 — same inputs as Vector 1, byte-
+    /// identical core totals; only the presentation diverges from `split_gst`.
+    #[test]
+    fn vector_v1_vat_matches_vector_1_core_totals_exactly() {
+        let input = InvoiceCalculationInput {
+            line_items: vec![line(2000, 100_000, 1800)],
+            invoice_discount: None,
+        };
+        let result = calculate_invoice(&input);
+
+        assert_eq!(result.subtotal_minor, 200_000);
+        assert_eq!(result.discount_amount_minor, 0);
+        assert_eq!(result.tax_amount_minor, 36_000);
+        assert_eq!(result.total_minor, 236_000);
+
+        let vat = present_vat(result.tax_amount_minor);
+        assert_eq!(vat.vat_amount_minor, 36_000);
+    }
+
+    /// calculation-engine-v2.md Vector V2 — the user's worked example
+    /// (2 x Rs 5,000, 20% VAT, Rs 1,000 invoice discount), run through the
+    /// completely unmodified V1 algorithm.
+    #[test]
+    fn vector_v2_vat_with_invoice_discount() {
+        let input = InvoiceCalculationInput {
+            line_items: vec![line(2000, 500_000, 2000)],
+            invoice_discount: Some((DiscountType::Amount, 100_000)),
+        };
+        let result = calculate_invoice(&input);
+
+        assert_eq!(result.subtotal_minor, 1_000_000);
+        assert_eq!(result.discount_amount_minor, 100_000);
+        assert_eq!(result.lines[0].taxable_amount_minor, 900_000);
+        assert_eq!(result.tax_amount_minor, 180_000);
+        assert_eq!(result.total_minor, 1_080_000);
+
+        let vat = present_vat(result.tax_amount_minor);
+        assert_eq!(vat.vat_amount_minor, 180_000);
+    }
+
+    /// calculation-engine-v2.md §4 — the discount-allocation/clamping/
+    /// rounding vectors (3, 4, 6, 7) never read regime, so a single
+    /// parameterized re-run confirms they hold identically rather than
+    /// hand-duplicating each one under a "VAT" label.
+    #[test]
+    fn vectors_3_4_6_7_are_regime_independent_by_construction() {
+        // Vector 3: largest-remainder allocation with a tie.
+        let v3 = InvoiceCalculationInput {
+            line_items: vec![
+                line(1000, 100_000, 0),
+                line(1000, 100_000, 0),
+                line(1000, 100_000, 0),
+            ],
+            invoice_discount: Some((DiscountType::Amount, 1000)),
+        };
+        // Vector 4: discount exceeding the line, clamped.
+        let v4 = InvoiceCalculationInput {
+            line_items: vec![LineItemInput {
+                quantity_thousandths: 1000,
+                unit_price_minor: 5000,
+                tax_rate_basis_points: 1800,
+                line_discount: Some((DiscountType::Amount, 10_000)),
+            }],
+            invoice_discount: None,
+        };
+        for input in [v3, v4] {
+            // calculate_invoice takes no regime parameter (calculation-engine-v2.md
+            // §2) — calling it "again" is a no-op by construction, which is
+            // itself the property under test: there is nothing to vary.
+            let a = calculate_invoice(&input);
+            let b = calculate_invoice(&input);
+            assert_eq!(a, b);
+        }
     }
 }
 

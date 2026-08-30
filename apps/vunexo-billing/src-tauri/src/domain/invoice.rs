@@ -4,6 +4,8 @@
 
 use chrono::{DateTime, NaiveDate, Utc};
 
+use super::tax_regime::TaxRegimeCode;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum DiscountType {
@@ -100,6 +102,16 @@ pub struct Invoice {
     pub issued_at: Option<DateTime<Utc>>,
     pub cancelled_at: Option<DateTime<Utc>>,
     pub cancel_reason: Option<String>,
+
+    /// `application-architecture-v2.md` §3 — display/traceability only, never
+    /// a live data dependency (`user-flows-v2.md` §3). `None` for any invoice
+    /// not created via `ConvertQuoteToInvoice`.
+    pub source_quote_id: Option<i64>,
+    /// Frozen at Issue exactly like every other snapshot column — `None`
+    /// while `Draft`, and also `None` on a pre-V2 issued invoice (normalized
+    /// to `IN_GST` at the repository boundary, `domain::tax_regime`'s
+    /// `normalize_legacy_snapshot` — application-architecture-v2.md §4b).
+    pub tax_regime_snapshot: Option<TaxRegimeCode>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -195,6 +207,9 @@ pub struct IssueInvoiceData {
     pub invoice_number_is_custom: bool,
     pub customer_snapshot: CustomerSnapshotFields,
     pub business_snapshot: BusinessSnapshotFields,
+    /// Frozen from `business.tax_regime_code` as read at this Issue — never
+    /// `None` for a V2-issued invoice (application-architecture-v2.md §4b).
+    pub tax_regime_snapshot: TaxRegimeCode,
     pub subtotal_minor: i64,
     pub discount_amount_minor: i64,
     pub tax_amount_minor: i64,
@@ -216,6 +231,9 @@ pub struct EditIssuedInvoiceData {
     pub customer_id: Option<i64>,
     pub customer_snapshot: CustomerSnapshotFields,
     pub business_snapshot: BusinessSnapshotFields,
+    /// Re-read fresh at this edit, same "explicit edit re-snapshots current
+    /// data" principle §4d already applies to `business_snapshot`.
+    pub tax_regime_snapshot: TaxRegimeCode,
     pub is_interstate: bool,
     pub invoice_date: NaiveDate,
     pub due_date: Option<NaiveDate>,

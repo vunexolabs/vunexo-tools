@@ -5,6 +5,7 @@ use crate::application::ports::business_repository::BusinessRepository;
 use crate::application::ports::infrastructure_error::InfrastructureError;
 use crate::application::ports::transaction::Transaction;
 use crate::domain::business::Business;
+use crate::domain::tax_regime::TaxRegimeCode;
 
 use super::transaction::sqlite_tx;
 
@@ -28,6 +29,9 @@ fn business_from_row(row: &sqlx::sqlite::SqliteRow) -> Business {
         gstin: row.get("gstin"),
         bank_details: row.get("bank_details"),
         upi_id: row.get("upi_id"),
+        tax_regime_code: TaxRegimeCode::from_db_str(
+            row.get::<String, _>("tax_regime_code").as_str(),
+        ),
     }
 }
 
@@ -40,8 +44,8 @@ impl BusinessRepository for SqliteBusinessRepository {
     ) -> Result<Business, InfrastructureError> {
         let conn = sqlite_tx(tx);
         sqlx::query(
-            "INSERT INTO business (id, name, logo_path, address, phone, email, gstin, bank_details, upi_id) \
-             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO business (id, name, logo_path, address, phone, email, gstin, bank_details, upi_id, tax_regime_code) \
+             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&business.name)
         .bind(&business.logo_path)
@@ -51,6 +55,7 @@ impl BusinessRepository for SqliteBusinessRepository {
         .bind(&business.gstin)
         .bind(&business.bank_details)
         .bind(&business.upi_id)
+        .bind(business.tax_regime_code.as_db_str())
         .execute(&mut **conn)
         .await?;
         Ok(business)
@@ -58,7 +63,7 @@ impl BusinessRepository for SqliteBusinessRepository {
 
     async fn get(&self) -> Result<Option<Business>, InfrastructureError> {
         let row = sqlx::query(
-            "SELECT name, logo_path, address, phone, email, gstin, bank_details, upi_id FROM business WHERE id = 1",
+            "SELECT name, logo_path, address, phone, email, gstin, bank_details, upi_id, tax_regime_code FROM business WHERE id = 1",
         )
         .fetch_optional(&self.pool)
         .await?;
@@ -73,7 +78,7 @@ impl BusinessRepository for SqliteBusinessRepository {
         let conn = sqlite_tx(tx);
         sqlx::query(
             "UPDATE business SET name = ?, logo_path = ?, address = ?, phone = ?, email = ?, \
-             gstin = ?, bank_details = ?, upi_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+             gstin = ?, bank_details = ?, upi_id = ?, tax_regime_code = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
         )
         .bind(&business.name)
         .bind(&business.logo_path)
@@ -83,6 +88,7 @@ impl BusinessRepository for SqliteBusinessRepository {
         .bind(&business.gstin)
         .bind(&business.bank_details)
         .bind(&business.upi_id)
+        .bind(business.tax_regime_code.as_db_str())
         .execute(&mut **conn)
         .await?;
         Ok(business)

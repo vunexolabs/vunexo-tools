@@ -14,6 +14,8 @@ pub mod invoice_pdf_renderer;
 pub mod invoice_repository;
 pub mod payment_repository;
 pub mod product_repository;
+pub mod quote_number_sequencer;
+pub mod quote_repository;
 pub mod settings_repository;
 pub mod tax_rate_repository;
 pub mod transaction;

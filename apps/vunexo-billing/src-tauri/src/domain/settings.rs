@@ -10,6 +10,15 @@ pub struct Settings {
     pub invoice_number_format: String,
     pub default_due_days: i64,
     pub default_tax_rate_id: Option<i64>,
+    /// database-schema-v2.md §6 — locks read-only after the first issued
+    /// quote, same rule and same independence from `invoice_number_format`
+    /// as the existing lock (`QuoteUseCases`/`InvoiceUseCases` each check
+    /// their own document type's issuance history).
+    pub quote_number_format: String,
+    /// application-architecture-v2.md §3 — `None` means "use the built-in
+    /// default template," never a row that has to exist before the payment
+    /// reminder feature works.
+    pub payment_reminder_template: Option<String>,
 }
 
 /// Full-replace update input — see `domain::customer::CustomerFields`'s
@@ -22,4 +31,14 @@ pub struct SettingsFields {
     pub invoice_number_format: String,
     pub default_due_days: i64,
     pub default_tax_rate_id: Option<i64>,
+    /// `serde(default)` so the not-yet-updated V1 frontend (which doesn't
+    /// send these fields) keeps working at the Tauri command boundary.
+    #[serde(default = "default_quote_number_format")]
+    pub quote_number_format: String,
+    #[serde(default)]
+    pub payment_reminder_template: Option<String>,
+}
+
+fn default_quote_number_format() -> String {
+    "QUO-{year}-{seq:04d}".to_string()
 }

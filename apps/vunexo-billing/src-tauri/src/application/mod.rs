@@ -13,6 +13,7 @@ pub mod payments;
 pub mod pdf;
 pub mod ports;
 pub mod products;
+pub mod quotes;
 pub mod settings;
 pub mod tax_rates;
 

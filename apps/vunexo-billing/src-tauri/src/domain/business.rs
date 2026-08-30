@@ -22,6 +22,13 @@ pub struct Business {
     pub gstin: Option<String>,
     pub bank_details: Option<String>,
     pub upi_id: Option<String>,
+    /// user-flows-v2.md §1: a single, forward-looking business-level setting.
+    /// Defaults to `IN_GST` (V1's only regime), so existing V1 businesses see
+    /// zero behavior change until they deliberately switch. `serde(default)`
+    /// so the not-yet-updated V1 frontend (which doesn't send this field)
+    /// keeps working at the Tauri command boundary.
+    #[serde(default)]
+    pub tax_regime_code: super::tax_regime::TaxRegimeCode,
 }
 
 /// The name a newly imported logo is stored under. Fixed, so nothing has to

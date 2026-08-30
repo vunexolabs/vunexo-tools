@@ -191,6 +191,7 @@ impl InvoiceUseCases {
                 address: customer.address,
                 gstin: customer.gstin,
             },
+            tax_regime_snapshot: business.tax_regime_code,
             business_snapshot: BusinessSnapshotFields {
                 name: Some(business.name),
                 address: business.address,
@@ -282,6 +283,7 @@ impl InvoiceUseCases {
                 address: customer.address,
                 gstin: customer.gstin,
             },
+            tax_regime_snapshot: business.tax_regime_code,
             business_snapshot: BusinessSnapshotFields {
                 name: Some(business.name),
                 address: business.address,
@@ -494,7 +496,11 @@ fn invoice_line_items_to_calc_input(
     }
 }
 
-fn assemble_draft_to_save(
+/// `pub(crate)` — also called directly by `application::quotes`'s
+/// `ConvertQuoteToInvoice` (application-architecture-v2.md §4c), which needs
+/// the exact same assembly logic for the invoice draft it builds from a
+/// quote's line items.
+pub(crate) fn assemble_draft_to_save(
     draft: DraftInvoiceInput,
     calc: &InvoiceCalculationResult,
 ) -> DraftInvoiceToSave {
@@ -593,6 +599,7 @@ mod integration_tests {
     use crate::domain::invoice::{DiscountType, DraftInvoiceInput, InvoiceStatus};
     use crate::domain::invoice_line_item::LineItemInput;
     use crate::domain::payment::{NewPayment, PaymentMethod};
+    use crate::domain::tax_regime::TaxRegimeCode;
     use crate::infrastructure::database::sqlite_business_repository::SqliteBusinessRepository;
     use crate::infrastructure::database::sqlite_customer_repository::SqliteCustomerRepository;
     use crate::infrastructure::database::sqlite_invoice_number_sequencer::SqliteInvoiceNumberSequencer;
@@ -700,6 +707,7 @@ mod integration_tests {
                 gstin: Some("29ABCDE1234F1Z5".into()),
                 bank_details: None,
                 upi_id: None,
+                tax_regime_code: TaxRegimeCode::InGst,
             })
             .await
             .expect("create_business");
@@ -813,6 +821,7 @@ mod integration_tests {
                 gstin: None,
                 bank_details: None,
                 upi_id: None,
+                tax_regime_code: TaxRegimeCode::InGst,
             })
             .await
             .expect("create_business");
@@ -871,6 +880,7 @@ mod integration_tests {
                 gstin: None,
                 bank_details: None,
                 upi_id: None,
+                tax_regime_code: TaxRegimeCode::InGst,
             })
             .await
             .unwrap();
@@ -932,6 +942,7 @@ mod integration_tests {
                 gstin: None,
                 bank_details: None,
                 upi_id: None,
+                tax_regime_code: TaxRegimeCode::InGst,
             })
             .await
             .unwrap();
@@ -1000,6 +1011,7 @@ mod integration_tests {
                 gstin: None,
                 bank_details: None,
                 upi_id: None,
+                tax_regime_code: TaxRegimeCode::InGst,
             })
             .await
             .unwrap();
@@ -1063,6 +1075,7 @@ mod integration_tests {
                 gstin: None,
                 bank_details: None,
                 upi_id: None,
+                tax_regime_code: TaxRegimeCode::InGst,
             })
             .await
             .unwrap();
@@ -1118,6 +1131,7 @@ mod integration_tests {
                 gstin: None,
                 bank_details: None,
                 upi_id: None,
+                tax_regime_code: TaxRegimeCode::InGst,
             })
             .await
             .unwrap();
@@ -1219,6 +1233,7 @@ mod integration_tests {
                 gstin: None,
                 bank_details: None,
                 upi_id: None,
+                tax_regime_code: TaxRegimeCode::InGst,
             })
             .await
             .unwrap();

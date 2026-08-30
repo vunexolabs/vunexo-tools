@@ -16,5 +16,8 @@ pub mod invoice_pdf;
 pub mod money;
 pub mod payment;
 pub mod product;
+pub mod quote;
+pub mod quote_line_item;
 pub mod settings;
 pub mod tax_rate;
+pub mod tax_regime;

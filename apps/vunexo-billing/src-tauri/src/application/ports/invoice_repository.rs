@@ -20,6 +20,18 @@ pub trait InvoiceRepository: Send + Sync {
         draft: DraftInvoiceToSave,
     ) -> Result<InvoiceWithLineItems, InfrastructureError>;
 
+    /// `ConvertQuoteToInvoice`'s half of the atomic two-table transaction
+    /// (application-architecture-v2.md §4c) — identical to `create_draft`
+    /// except the new row's `source_quote_id` is set. Kept as its own method
+    /// rather than adding an optional field to `create_draft`'s signature, so
+    /// the ordinary create-draft path is untouched by the V2 addition.
+    async fn create_draft_from_quote(
+        &self,
+        tx: &mut dyn Transaction,
+        source_quote_id: i64,
+        draft: DraftInvoiceToSave,
+    ) -> Result<InvoiceWithLineItems, InfrastructureError>;
+
     /// Preconditions (status = Draft) are the use case's job, not the
     /// repository's — see application-architecture.md §4.
     async fn update_draft(

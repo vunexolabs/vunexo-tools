@@ -572,6 +572,8 @@ mod tests {
             invoice_number_format: "INV-{YYYY}-{####}".to_string(),
             default_due_days: 15,
             default_tax_rate_id: None,
+            quote_number_format: "QUO-{year}-{seq:04d}".to_string(),
+            payment_reminder_template: None,
         }
     }
 
@@ -609,6 +611,8 @@ mod tests {
             issued_at: None,
             cancelled_at: None,
             cancel_reason: None,
+            source_quote_id: None,
+            tax_regime_snapshot: Some(crate::domain::tax_regime::TaxRegimeCode::InGst),
         }
     }
 
@@ -627,6 +631,7 @@ mod tests {
             business_snapshot_bank_details: None,
             business_snapshot_upi_id: None,
             business_snapshot_logo_path: None,
+            tax_regime_snapshot: None,
             due_date: None,
             terms: None,
             ..issued_invoice()
@@ -643,6 +648,7 @@ mod tests {
             gstin: Some("29CCCCC2222C1Z5".to_string()),
             bank_details: Some("Live Bank • 0002".to_string()),
             upi_id: None,
+            tax_regime_code: crate::domain::tax_regime::TaxRegimeCode::InGst,
         }
     }
 

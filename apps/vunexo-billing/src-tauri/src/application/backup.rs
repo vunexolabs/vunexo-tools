@@ -280,6 +280,7 @@ mod integration_tests {
                     gstin: Some("29AAAAA0000A1Z5".into()),
                     bank_details: None,
                     upi_id: None,
+                    tax_regime_code: crate::domain::tax_regime::TaxRegimeCode::InGst,
                 },
             )
             .await
