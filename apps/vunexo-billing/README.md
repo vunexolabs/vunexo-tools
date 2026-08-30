@@ -21,7 +21,7 @@ No account, no subscription, no ads, no cloud dependency. All data stays in a lo
 These are unsigned development builds, not notarized/certified releases — Windows SmartScreen and macOS Gatekeeper will both warn on first launch:
 
 - **Windows**: click "More info" → "Run anyway."
-- **macOS**: right-click the app → "Open" (only needed the first time), since double-clicking an unsigned app is blocked by default. If macOS instead says the app **"is damaged and can't be opened"** — this happens on Apple Silicon for a build made before ad-hoc signing was added, or if Gatekeeper still won't budge — it's not actually corrupt; clear the quarantine flag it can't verify:
+- **macOS**: right-click the app → "Open" (only needed the first time), since double-clicking an unsigned app is blocked by default. If macOS instead says the app **"is damaged and can't be opened"**, it's not actually corrupt — that specific error means it's missing a code signature entirely, and it's not what you should see from this build. Re-download from the link above (an older build before ad-hoc signing was added would trigger it) and it should go away; if it doesn't, clear the quarantine flag Gatekeeper couldn't verify:
   ```bash
   xattr -cr "/Applications/Vunexo Billing.app"
   ```
