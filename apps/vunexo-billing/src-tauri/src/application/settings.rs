@@ -6,12 +6,14 @@ use crate::domain::settings::{Settings, SettingsFields};
 
 use super::error::ApplicationError;
 use super::ports::invoice_repository::InvoiceRepository;
+use super::ports::quote_repository::QuoteRepository;
 use super::ports::settings_repository::SettingsRepository;
 use super::ports::transaction::TransactionManager;
 
 pub struct SettingsUseCases {
     repo: Arc<dyn SettingsRepository>,
     invoice_repo: Arc<dyn InvoiceRepository>,
+    quote_repo: Arc<dyn QuoteRepository>,
     tx_manager: Arc<dyn TransactionManager>,
 }
 
@@ -19,11 +21,13 @@ impl SettingsUseCases {
     pub fn new(
         repo: Arc<dyn SettingsRepository>,
         invoice_repo: Arc<dyn InvoiceRepository>,
+        quote_repo: Arc<dyn QuoteRepository>,
         tx_manager: Arc<dyn TransactionManager>,
     ) -> Self {
         Self {
             repo,
             invoice_repo,
+            quote_repo,
             tx_manager,
         }
     }
@@ -32,9 +36,11 @@ impl SettingsUseCases {
         Ok(self.repo.get().await?)
     }
 
-    /// `invoice_number_format` becomes read-only once any invoice has been
-    /// issued (database-schema.md §7) — enforced here, not left to the UI
-    /// to remember.
+    /// `invoice_number_format`/`quote_number_format` each become read-only
+    /// once any invoice/quote has been issued (database-schema.md §7,
+    /// database-schema-v2.md §6) — enforced here, not left to the UI to
+    /// remember. The two locks are independent: a business could issue its
+    /// first invoice and first quote in either order.
     pub async fn update_settings(
         &self,
         fields: SettingsFields,
@@ -45,6 +51,14 @@ impl SettingsUseCases {
         {
             return Err(ApplicationError::Conflict(
                 "invoice numbering format can't be changed after the first invoice has been issued"
+                    .into(),
+            ));
+        }
+        if fields.quote_number_format != current.quote_number_format
+            && self.quote_repo.has_any_issued().await?
+        {
+            return Err(ApplicationError::Conflict(
+                "quote numbering format can't be changed after the first quote has been issued"
                     .into(),
             ));
         }

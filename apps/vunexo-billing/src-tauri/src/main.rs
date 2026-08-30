@@ -28,10 +28,13 @@ use application::ports::invoice_pdf_renderer::InvoicePdfRenderer;
 use application::ports::invoice_repository::InvoiceRepository;
 use application::ports::payment_repository::PaymentRepository;
 use application::ports::product_repository::ProductRepository;
+use application::ports::quote_number_sequencer::QuoteNumberSequencer;
+use application::ports::quote_repository::QuoteRepository;
 use application::ports::settings_repository::SettingsRepository;
 use application::ports::tax_rate_repository::TaxRateRepository;
 use application::ports::transaction::TransactionManager;
 use application::products::ProductUseCases;
+use application::quotes::QuoteUseCases;
 use application::settings::SettingsUseCases;
 use application::tax_rates::TaxRateUseCases;
 use infrastructure::database::database_file::SqliteDatabaseFile;
@@ -42,6 +45,8 @@ use infrastructure::database::sqlite_invoice_number_sequencer::SqliteInvoiceNumb
 use infrastructure::database::sqlite_invoice_repository::SqliteInvoiceRepository;
 use infrastructure::database::sqlite_payment_repository::SqlitePaymentRepository;
 use infrastructure::database::sqlite_product_repository::SqliteProductRepository;
+use infrastructure::database::sqlite_quote_number_sequencer::SqliteQuoteNumberSequencer;
+use infrastructure::database::sqlite_quote_repository::SqliteQuoteRepository;
 use infrastructure::database::sqlite_settings_repository::SqliteSettingsRepository;
 use infrastructure::database::sqlite_tax_rate_repository::SqliteTaxRateRepository;
 use infrastructure::database::transaction::SqlxTransactionManager;
@@ -86,7 +91,11 @@ fn main() {
                 Arc::new(SqliteDatabaseFile::new(pool.clone(), db_path));
             let backup_archive: Arc<dyn BackupArchive> = Arc::new(VbxArchive::new());
             let sequencer: Arc<dyn InvoiceNumberSequencer> =
-                Arc::new(SqliteInvoiceNumberSequencer::new(pool));
+                Arc::new(SqliteInvoiceNumberSequencer::new(pool.clone()));
+            let quote_repo: Arc<dyn QuoteRepository> =
+                Arc::new(SqliteQuoteRepository::new(pool.clone()));
+            let quote_sequencer: Arc<dyn QuoteNumberSequencer> =
+                Arc::new(SqliteQuoteNumberSequencer::new(pool));
             let pdf_renderer: Arc<dyn InvoicePdfRenderer> =
                 Arc::new(PrintpdfInvoiceRenderer::new());
             let file_writer: Arc<dyn FileWriter> = Arc::new(StdFileWriter::new());
@@ -108,6 +117,7 @@ fn main() {
             app.manage(SettingsUseCases::new(
                 settings_repo.clone(),
                 invoice_repo.clone(),
+                quote_repo.clone(),
                 tx_manager.clone(),
             ));
             app.manage(PaymentUseCases::new(
@@ -146,6 +156,15 @@ fn main() {
                 settings_repo.clone(),
                 tax_rate_repo,
                 file_writer.clone(),
+            ));
+            app.manage(QuoteUseCases::new(
+                quote_repo,
+                invoice_repo.clone(),
+                customer_repo.clone(),
+                business_repo.clone(),
+                settings_repo.clone(),
+                quote_sequencer,
+                tx_manager.clone(),
             ));
             app.manage(DashboardUseCases::new(dashboard_repo));
             app.manage(InvoiceUseCases::new(
@@ -190,6 +209,18 @@ fn main() {
             commands::duplicate_invoice,
             commands::get_invoice,
             commands::list_invoices,
+            commands::preview_next_quote_number,
+            commands::create_draft_quote,
+            commands::update_draft_quote,
+            commands::issue_quote,
+            commands::accept_quote,
+            commands::decline_quote,
+            commands::cancel_quote,
+            commands::convert_quote_to_invoice,
+            commands::duplicate_quote,
+            commands::delete_draft_quote,
+            commands::get_quote,
+            commands::list_quotes,
             commands::record_payment,
             commands::update_payment,
             commands::delete_payment,

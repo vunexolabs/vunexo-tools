@@ -14,6 +14,7 @@ use crate::application::invoices::InvoiceUseCases;
 use crate::application::payments::PaymentUseCases;
 use crate::application::pdf::PdfUseCases;
 use crate::application::products::ProductUseCases;
+use crate::application::quotes::QuoteUseCases;
 use crate::application::settings::SettingsUseCases;
 use crate::application::tax_rates::TaxRateUseCases;
 use crate::application::ApplicationError;
@@ -28,6 +29,7 @@ use crate::domain::invoice::{
 use crate::domain::invoice_pdf::LogoProbe;
 use crate::domain::payment::{NewPayment, Payment, PaymentFields};
 use crate::domain::product::{Product, ProductFields, ProductFilter, ProductListItem};
+use crate::domain::quote::{DraftQuoteInput, QuoteFilter, QuoteSummary, QuoteWithLineItems};
 use crate::domain::settings::{Settings, SettingsFields};
 use crate::domain::tax_rate::{TaxRate, TaxRateFields};
 
@@ -270,6 +272,106 @@ pub async fn list_invoices(
     filter: InvoiceFilter,
 ) -> Result<Vec<InvoiceSummary>, ApplicationError> {
     invoice_use_cases.list_invoices(filter).await
+}
+
+#[tauri::command]
+pub async fn preview_next_quote_number(
+    quote_use_cases: State<'_, QuoteUseCases>,
+) -> Result<String, ApplicationError> {
+    quote_use_cases.preview_next_quote_number().await
+}
+
+#[tauri::command]
+pub async fn create_draft_quote(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    input: DraftQuoteInput,
+) -> Result<QuoteWithLineItems, ApplicationError> {
+    quote_use_cases.create_draft_quote(input).await
+}
+
+#[tauri::command]
+pub async fn update_draft_quote(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    id: i64,
+    input: DraftQuoteInput,
+) -> Result<QuoteWithLineItems, ApplicationError> {
+    quote_use_cases.update_draft_quote(id, input).await
+}
+
+#[tauri::command]
+pub async fn issue_quote(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    id: i64,
+) -> Result<QuoteWithLineItems, ApplicationError> {
+    quote_use_cases.issue_quote(id).await
+}
+
+#[tauri::command]
+pub async fn accept_quote(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    id: i64,
+) -> Result<(), ApplicationError> {
+    quote_use_cases.accept_quote(id).await
+}
+
+#[tauri::command]
+pub async fn decline_quote(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    id: i64,
+) -> Result<(), ApplicationError> {
+    quote_use_cases.decline_quote(id).await
+}
+
+#[tauri::command]
+pub async fn cancel_quote(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    id: i64,
+    reason: Option<String>,
+) -> Result<(), ApplicationError> {
+    quote_use_cases.cancel_quote(id, reason).await
+}
+
+/// application-architecture-v2.md §4c — the one command that produces a new
+/// invoice as a side effect. Returns the resulting Draft invoice, matching
+/// user-flows-v2.md §3's "user lands on the new Draft Invoice."
+#[tauri::command]
+pub async fn convert_quote_to_invoice(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    id: i64,
+) -> Result<InvoiceWithLineItems, ApplicationError> {
+    quote_use_cases.convert_quote_to_invoice(id).await
+}
+
+#[tauri::command]
+pub async fn duplicate_quote(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    id: i64,
+) -> Result<QuoteWithLineItems, ApplicationError> {
+    quote_use_cases.duplicate_quote(id).await
+}
+
+#[tauri::command]
+pub async fn delete_draft_quote(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    id: i64,
+) -> Result<(), ApplicationError> {
+    quote_use_cases.delete_draft_quote(id).await
+}
+
+#[tauri::command]
+pub async fn get_quote(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    id: i64,
+) -> Result<QuoteWithLineItems, ApplicationError> {
+    quote_use_cases.get_quote_with_line_items(id).await
+}
+
+#[tauri::command]
+pub async fn list_quotes(
+    quote_use_cases: State<'_, QuoteUseCases>,
+    filter: QuoteFilter,
+) -> Result<Vec<QuoteSummary>, ApplicationError> {
+    quote_use_cases.list_quotes(filter).await
 }
 
 #[tauri::command]
