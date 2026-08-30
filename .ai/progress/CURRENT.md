@@ -10,6 +10,7 @@ Last updated: 2026-08-30.
 
 - `.ai/product.md` — the locked V1 spec (what Vunexo Billing is, in/out of scope). Rarely changes.
 - `.ai/product-v2.md` — the locked V2 spec (2026-08-30, session 12): a complete quote-to-payment billing workflow with a country-aware tax engine. `.ai/product-v2-scope.md` is the Round 1 research trail it was decided from — read for *why*, not *what*.
+- `docs/vunexo-billing/user-flows-v2.md` — locked V2 Round 2 (2026-08-30, session 12): tax regime configuration, Quote lifecycle, Quote→Invoice conversion, customer statement, reports, payment reminder, UPI QR.
 - `.ai/decisions/ADR-*.md` — architecture decision records. Append new ones, never edit old ones.
 - `docs/vunexo-billing/*.md` — the locked Round 2–6 design docs (user-flows, database-schema, application-architecture, ui-ux, calculation-engine). Source of truth for *how* something should work — check before implementing, don't guess.
 - `.ai/progress/` (this folder) — *as-built* state and history. Everything above is the plan; this is what's actually done.
@@ -84,7 +85,7 @@ Backend: 116 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — s
 ## Next up
 
 - **Confirm Windows/Linux installers on real hardware** — the one remaining V1 DoD item. Not urgent (doesn't block using the app), but V1 isn't *fully* closed out until this happens.
-- **V2 scope is locked** (`.ai/product-v2.md`, 2026-08-30 session 12) — multi-country tax (foundation) + Quotes/Estimates→Invoice + customer statements + sales/tax reports + payment reminders + UPI QR. Next round per its own roadmap: user flows for the new lifecycle pieces, then schema/architecture deltas, then the calculation-engine work to generalize tax beyond GST — that's the one round touching the money-math core, everything else is additive. Not started yet.
+- **V2 scope locked, Round 2 (user flows) done** (2026-08-30 session 12) — `.ai/product-v2.md` + `docs/vunexo-billing/user-flows-v2.md`. Quote state machine, numbering, tax-regime-as-business-setting, and no-send-tracking-for-reminders decisions are all made. **Not started: Round 3 (database schema deltas) and Round 4 (application architecture deltas)** — next up. Round 6 (calculation engine) is the one round touching the money-math core; everything else is additive.
 
 ## Verification commands (all of these, every slice)
 
