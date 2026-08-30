@@ -6,17 +6,23 @@ use tauri::State;
 
 use crate::application::business::BusinessUseCases;
 use crate::application::customers::CustomerUseCases;
+use crate::application::dashboard::DashboardUseCases;
 use crate::application::invoices::InvoiceUseCases;
+use crate::application::payments::PaymentUseCases;
 use crate::application::products::ProductUseCases;
 use crate::application::settings::SettingsUseCases;
+use crate::application::tax_rates::TaxRateUseCases;
 use crate::application::ApplicationError;
 use crate::domain::business::Business;
 use crate::domain::customer::{Customer, CustomerFields, CustomerFilter, CustomerListItem};
+use crate::domain::dashboard::DashboardMetrics;
 use crate::domain::invoice::{
     DraftInvoiceInput, InvoiceFilter, InvoiceSummary, InvoiceWithLineItems,
 };
+use crate::domain::payment::{NewPayment, Payment, PaymentFields};
 use crate::domain::product::{Product, ProductFields, ProductFilter, ProductListItem};
 use crate::domain::settings::{Settings, SettingsFields};
+use crate::domain::tax_rate::{TaxRate, TaxRateFields};
 
 /// Round 1 technical spike: proves the React -> Tauri -> Rust round trip.
 #[tauri::command]
@@ -210,6 +216,15 @@ pub async fn issue_invoice(
 }
 
 #[tauri::command]
+pub async fn edit_issued_invoice(
+    invoice_use_cases: State<'_, InvoiceUseCases>,
+    id: i64,
+    input: DraftInvoiceInput,
+) -> Result<InvoiceWithLineItems, ApplicationError> {
+    invoice_use_cases.edit_issued_invoice(id, input).await
+}
+
+#[tauri::command]
 pub async fn cancel_invoice(
     invoice_use_cases: State<'_, InvoiceUseCases>,
     id: i64,
@@ -248,4 +263,70 @@ pub async fn list_invoices(
     filter: InvoiceFilter,
 ) -> Result<Vec<InvoiceSummary>, ApplicationError> {
     invoice_use_cases.list_invoices(filter).await
+}
+
+#[tauri::command]
+pub async fn record_payment(
+    payment_use_cases: State<'_, PaymentUseCases>,
+    payment: NewPayment,
+) -> Result<Payment, ApplicationError> {
+    payment_use_cases.record_payment(payment).await
+}
+
+#[tauri::command]
+pub async fn update_payment(
+    payment_use_cases: State<'_, PaymentUseCases>,
+    id: i64,
+    fields: PaymentFields,
+) -> Result<Payment, ApplicationError> {
+    payment_use_cases.update_payment(id, fields).await
+}
+
+#[tauri::command]
+pub async fn delete_payment(
+    payment_use_cases: State<'_, PaymentUseCases>,
+    id: i64,
+) -> Result<(), ApplicationError> {
+    payment_use_cases.delete_payment(id).await
+}
+
+#[tauri::command]
+pub async fn list_payments_for_invoice(
+    payment_use_cases: State<'_, PaymentUseCases>,
+    invoice_id: i64,
+) -> Result<Vec<Payment>, ApplicationError> {
+    payment_use_cases
+        .list_payments_for_invoice(invoice_id)
+        .await
+}
+
+#[tauri::command]
+pub async fn create_tax_rate(
+    tax_rate_use_cases: State<'_, TaxRateUseCases>,
+    fields: TaxRateFields,
+) -> Result<TaxRate, ApplicationError> {
+    tax_rate_use_cases.create_tax_rate(fields).await
+}
+
+#[tauri::command]
+pub async fn update_tax_rate(
+    tax_rate_use_cases: State<'_, TaxRateUseCases>,
+    id: i64,
+    fields: TaxRateFields,
+) -> Result<TaxRate, ApplicationError> {
+    tax_rate_use_cases.update_tax_rate(id, fields).await
+}
+
+#[tauri::command]
+pub async fn list_tax_rates(
+    tax_rate_use_cases: State<'_, TaxRateUseCases>,
+) -> Result<Vec<TaxRate>, ApplicationError> {
+    tax_rate_use_cases.list_tax_rates().await
+}
+
+#[tauri::command]
+pub async fn get_dashboard_metrics(
+    dashboard_use_cases: State<'_, DashboardUseCases>,
+) -> Result<DashboardMetrics, ApplicationError> {
+    dashboard_use_cases.get_dashboard_metrics().await
 }

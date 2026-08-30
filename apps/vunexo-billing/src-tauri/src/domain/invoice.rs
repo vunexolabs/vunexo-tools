@@ -1,8 +1,6 @@
 //! Invoice domain types. database-schema.md §13 (`invoices`) —
-//! application-architecture.md §2/§3b, restricted to what this round's
-//! use cases (create/update draft, issue, cancel, delete draft, get, list)
-//! actually need — `EditIssuedInvoice` and payment-driven `set_status` land
-//! alongside the Payments slice.
+//! application-architecture.md §2/§3b. The payment-driven `set_status`
+//! path is implemented in `application/payments.rs`.
 
 use chrono::{DateTime, NaiveDate, Utc};
 
@@ -197,6 +195,34 @@ pub struct IssueInvoiceData {
     pub invoice_number_is_custom: bool,
     pub customer_snapshot: CustomerSnapshotFields,
     pub business_snapshot: BusinessSnapshotFields,
+    pub subtotal_minor: i64,
+    pub discount_amount_minor: i64,
+    pub tax_amount_minor: i64,
+    pub total_minor: i64,
+    pub line_items: Vec<super::invoice_line_item::LineItemToSave>,
+}
+
+/// Everything `InvoiceRepository::update_issued` needs to write in one
+/// transaction (application-architecture.md §4 "EditIssuedInvoice";
+/// user-flows.md's "Editing an issued invoice" rule): the freshly
+/// re-snapshotted customer/business data (re-read at *this* save, per that
+/// rule — an explicit edit, not a customer record silently drifting) plus
+/// recomputed totals and line items. Deliberately excludes
+/// `invoice_number`/`invoice_number_is_custom`/`status` — none of those are
+/// ever touched by an edit; the number is immutable once issued and status
+/// is exclusively payment-driven (`application/payments.rs`).
+#[derive(Debug, Clone)]
+pub struct EditIssuedInvoiceData {
+    pub customer_id: Option<i64>,
+    pub customer_snapshot: CustomerSnapshotFields,
+    pub business_snapshot: BusinessSnapshotFields,
+    pub is_interstate: bool,
+    pub invoice_date: NaiveDate,
+    pub due_date: Option<NaiveDate>,
+    pub notes: Option<String>,
+    pub terms: Option<String>,
+    pub discount_type: Option<DiscountType>,
+    pub discount_value: Option<i64>,
     pub subtotal_minor: i64,
     pub discount_amount_minor: i64,
     pub tax_amount_minor: i64,

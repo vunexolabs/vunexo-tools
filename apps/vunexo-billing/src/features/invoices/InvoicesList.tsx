@@ -1,25 +1,44 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { StatusBadge } from "../../components/StatusBadge";
+import { PaymentPanel } from "../payments/PaymentPanel";
 import { createDraftInvoice } from "../../lib/tauri/commands";
+import { useCurrency } from "../../hooks/useCurrency";
 import { useInvoices } from "../../hooks/useInvoices";
-import { formatMinorAsRupees, type InvoiceStatus } from "../../lib/tauri/types";
+import type { InvoiceStatus } from "../../lib/tauri/types";
 
-const STATUS_FILTERS: { label: string; value: InvoiceStatus | null }[] = [
+type FilterOption = InvoiceStatus | "OVERDUE" | null;
+
+const STATUS_FILTERS: { label: string; value: FilterOption }[] = [
   { label: "All", value: null },
   { label: "Draft", value: "DRAFT" },
   { label: "Issued", value: "ISSUED" },
   { label: "Partially Paid", value: "PARTIALLY_PAID" },
   { label: "Paid", value: "PAID" },
+  { label: "Overdue", value: "OVERDUE" },
   { label: "Cancelled", value: "CANCELLED" },
 ];
 
-/** ui-ux.md §5 — filter bar, table, "+ New" action, quick row actions. */
+/**
+ * ui-ux.md §5 — filter bar, table, "+ New" action, quick row actions.
+ * `OVERDUE` is a derived pseudo-status (database-schema.md §8) — it isn't a
+ * stored `InvoiceFilter.status` value the backend can query by, so it's
+ * filtered client-side over the already-computed `is_overdue` flag every
+ * row already carries, rather than added as a fake stored status.
+ */
 export function InvoicesList({ onOpen }: { onOpen: (id: number) => void }) {
-  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | null>(null);
-  const { invoices, error, cancel, remove, duplicate } = useInvoices(statusFilter);
+  const { symbol, formatMinor } = useCurrency();
+  const [filter, setFilter] = useState<FilterOption>(null);
+  const queryStatus = filter === "OVERDUE" ? null : filter;
+  const { invoices: fetchedInvoices, error, cancel, remove, duplicate, reload } = useInvoices(queryStatus);
+  const invoices = filter === "OVERDUE" ? (fetchedInvoices?.filter((i) => i.is_overdue) ?? null) : fetchedInvoices;
   const [rowError, setRowError] = useState<unknown>(null);
   const [creating, setCreating] = useState(false);
+  const [paymentPanelFor, setPaymentPanelFor] = useState<number | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
   const runRowAction = async (action: () => Promise<void>) => {
     setRowError(null);
@@ -70,8 +89,8 @@ export function InvoicesList({ onOpen }: { onOpen: (id: number) => void }) {
         {STATUS_FILTERS.map((f) => (
           <button
             key={f.label}
-            onClick={() => setStatusFilter(f.value)}
-            className={`rounded px-2 py-1 ${statusFilter === f.value ? "bg-slate-800" : "text-slate-400 hover:bg-slate-900"}`}
+            onClick={() => setFilter(f.value)}
+            className={`rounded px-2 py-1 ${filter === f.value ? "bg-slate-800" : "text-slate-400 hover:bg-slate-900"}`}
           >
             {f.label}
           </button>
@@ -94,50 +113,113 @@ export function InvoicesList({ onOpen }: { onOpen: (id: number) => void }) {
         </thead>
         <tbody>
           {invoices?.map((inv) => (
-            <tr key={inv.id} className="border-t border-slate-800">
-              <td className="py-2">
-                <button onClick={() => onOpen(inv.id)} className="text-sky-400 hover:underline">
-                  {inv.invoice_number ?? `Draft #${inv.id}`}
-                </button>
-              </td>
-              <td className="py-2 text-slate-400">{inv.customer_name ?? "—"}</td>
-              <td className="py-2 text-slate-400">{inv.invoice_date}</td>
-              <td className="py-2 text-slate-400">₹{formatMinorAsRupees(inv.total_minor)}</td>
-              <td className="py-2">
-                <StatusBadge status={inv.status} isOverdue={inv.is_overdue} />
-              </td>
-              <td className="py-2 text-right">
-                <div className="flex justify-end gap-2">
-                  {inv.status === "DRAFT" && (
-                    <button onClick={() => runRowAction(() => remove(inv.id))} className="text-red-400 hover:underline">
-                      Delete
-                    </button>
-                  )}
-                  {(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID" || inv.status === "PAID") && (
-                    <button
-                      onClick={() => runRowAction(() => cancel(inv.id, null))}
-                      className="text-amber-400 hover:underline"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                  {inv.status !== "DRAFT" && (
-                    <button
-                      onClick={() => runRowAction(async () => { const d = await duplicate(inv.id); onOpen(d.id); })}
-                      className="text-sky-400 hover:underline"
-                    >
-                      Duplicate
-                    </button>
-                  )}
-                </div>
-              </td>
-            </tr>
+            <Fragment key={inv.id}>
+              <tr className="border-t border-slate-800">
+                <td className="py-2">
+                  <button onClick={() => onOpen(inv.id)} className="text-sky-400 hover:underline">
+                    {inv.invoice_number ?? `Draft #${inv.id}`}
+                  </button>
+                </td>
+                <td className="py-2 text-slate-400">{inv.customer_name ?? "—"}</td>
+                <td className="py-2 text-slate-400">{inv.invoice_date}</td>
+                <td className="py-2 text-slate-400">{symbol}{formatMinor(inv.total_minor)}</td>
+                <td className="py-2">
+                  <StatusBadge status={inv.status} isOverdue={inv.is_overdue} />
+                </td>
+                <td className="py-2 text-right">
+                  <div className="flex justify-end gap-2">
+                    {inv.status === "DRAFT" && (
+                      <button onClick={() => setDeleteTargetId(inv.id)} className="text-red-400 hover:underline">
+                        Delete
+                      </button>
+                    )}
+                    {(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID") && (
+                      <button
+                        onClick={() => setPaymentPanelFor(paymentPanelFor === inv.id ? null : inv.id)}
+                        className="text-emerald-400 hover:underline"
+                      >
+                        {paymentPanelFor === inv.id ? "Close" : "Record Payment"}
+                      </button>
+                    )}
+                    {(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID" || inv.status === "PAID") && (
+                      <button
+                        onClick={() => {
+                          setCancelReason("");
+                          setCancelTargetId(inv.id);
+                        }}
+                        className="text-amber-400 hover:underline"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    {inv.status !== "DRAFT" && (
+                      <button
+                        onClick={() => runRowAction(async () => { const d = await duplicate(inv.id); onOpen(d.id); })}
+                        className="text-sky-400 hover:underline"
+                      >
+                        Duplicate
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+              {paymentPanelFor === inv.id && (
+                <tr className="border-t border-slate-800">
+                  <td colSpan={6} className="py-2">
+                    <PaymentPanel
+                      invoiceId={inv.id}
+                      invoiceStatus={inv.status}
+                      totalMinor={inv.total_minor}
+                      onChanged={reload}
+                    />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>
 
       {invoices !== null && invoices.length === 0 && (
         <p className="text-sm text-slate-500">No invoices yet — click "+ New Invoice" to create one.</p>
+      )}
+
+      {deleteTargetId !== null && (
+        <ConfirmDialog
+          title="Delete this draft?"
+          message="This permanently deletes the draft and its line items. This can't be undone."
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setDeleteTargetId(null)}
+          onConfirm={async () => {
+            await runRowAction(() => remove(deleteTargetId));
+            setDeleteTargetId(null);
+          }}
+        />
+      )}
+
+      {cancelTargetId !== null && (
+        <ConfirmDialog
+          title="Cancel this invoice?"
+          message="Cancelling is terminal — a cancelled invoice can't be edited or issued again."
+          confirmLabel="Cancel Invoice"
+          danger
+          onCancel={() => setCancelTargetId(null)}
+          onConfirm={async () => {
+            await runRowAction(() => cancel(cancelTargetId, cancelReason.trim() || null));
+            setCancelTargetId(null);
+          }}
+        >
+          <label className="block text-sm">
+            Reason (optional)
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+              rows={2}
+            />
+          </label>
+        </ConfirmDialog>
       )}
     </div>
   );

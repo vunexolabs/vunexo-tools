@@ -1,15 +1,19 @@
 import { useState } from "react";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { useCurrency } from "../../hooks/useCurrency";
 import { useProducts } from "../../hooks/useProducts";
-import { formatMinorAsRupees, type Product, type ProductListItem } from "../../lib/tauri/types";
+import type { Product, ProductListItem } from "../../lib/tauri/types";
 import { ProductForm } from "./ProductForm";
 
 /** Mirrors features/customers/CustomersList.tsx exactly — see ui-ux.md §5. */
 export function ProductsList() {
+  const { symbol, formatMinor } = useCurrency();
   const [includeArchived, setIncludeArchived] = useState(false);
   const { products, error, create, update, archive, restore, remove } = useProducts(includeArchived);
   const [editing, setEditing] = useState<Product | "new" | null>(null);
   const [rowError, setRowError] = useState<unknown>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
   const runRowAction = async (action: () => Promise<void>) => {
     setRowError(null);
@@ -68,7 +72,7 @@ export function ProductsList() {
             <tr key={p.id} className="border-t border-slate-800">
               <td className="py-2">{p.name}</td>
               <td className="py-2 text-slate-400">{p.unit}</td>
-              <td className="py-2 text-slate-400">₹{formatMinorAsRupees(p.price_minor)}</td>
+              <td className="py-2 text-slate-400">{symbol}{formatMinor(p.price_minor)}</td>
               <td className="py-2">
                 <span className={p.status === "ARCHIVED" ? "text-slate-500" : "text-emerald-400"}>{p.status}</span>
               </td>
@@ -87,7 +91,7 @@ export function ProductsList() {
                     </button>
                   )}
                   {!p.has_invoices && (
-                    <button onClick={() => runRowAction(() => remove(p.id))} className="text-red-400 hover:underline">
+                    <button onClick={() => setDeleteTarget(p)} className="text-red-400 hover:underline">
                       Delete
                     </button>
                   )}
@@ -100,6 +104,20 @@ export function ProductsList() {
 
       {products !== null && products.length === 0 && (
         <p className="text-sm text-slate-500">No products yet — click "+ New Product" to add one.</p>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete this product?"
+          message={`"${deleteTarget.name}" has no invoice history, so this permanently removes the record. This can't be undone.`}
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={async () => {
+            await runRowAction(() => remove(deleteTarget.id));
+            setDeleteTarget(null);
+          }}
+        />
       )}
     </div>
   );

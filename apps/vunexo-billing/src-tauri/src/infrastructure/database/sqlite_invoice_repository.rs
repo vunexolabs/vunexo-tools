@@ -5,8 +5,8 @@ use crate::application::ports::infrastructure_error::InfrastructureError;
 use crate::application::ports::invoice_repository::InvoiceRepository;
 use crate::application::ports::transaction::Transaction;
 use crate::domain::invoice::{
-    DiscountType, DraftInvoiceToSave, Invoice, InvoiceFilter, InvoiceStatus, InvoiceSummary,
-    InvoiceWithLineItems, IssueInvoiceData,
+    DiscountType, DraftInvoiceToSave, EditIssuedInvoiceData, Invoice, InvoiceFilter, InvoiceStatus,
+    InvoiceSummary, InvoiceWithLineItems, IssueInvoiceData,
 };
 use crate::domain::invoice_line_item::{InvoiceLineItem, LineItemToSave};
 
@@ -280,6 +280,70 @@ impl InvoiceRepository for SqliteInvoiceRepository {
         .bind(&data.business_snapshot.bank_details)
         .bind(&data.business_snapshot.upi_id)
         .bind(&data.business_snapshot.logo_path)
+        .bind(data.subtotal_minor)
+        .bind(data.discount_amount_minor)
+        .bind(data.tax_amount_minor)
+        .bind(data.total_minor)
+        .bind(id)
+        .execute(&mut **conn)
+        .await?;
+
+        replace_line_items(&mut *conn, id, &data.line_items).await?;
+
+        let row = sqlx::query(&format!(
+            "SELECT {INVOICE_COLUMNS} FROM invoices WHERE id = ?"
+        ))
+        .bind(id)
+        .fetch_one(&mut **conn)
+        .await?;
+        let line_items = fetch_line_items(&mut **conn, id).await?;
+        Ok(InvoiceWithLineItems {
+            invoice: invoice_from_row(&row),
+            line_items,
+        })
+    }
+
+    async fn update_issued(
+        &self,
+        tx: &mut dyn Transaction,
+        id: i64,
+        data: EditIssuedInvoiceData,
+    ) -> Result<InvoiceWithLineItems, InfrastructureError> {
+        let conn = sqlite_tx(tx);
+        sqlx::query(
+            "UPDATE invoices SET customer_id = ?, \
+             customer_snapshot_name = ?, customer_snapshot_phone = ?, customer_snapshot_email = ?, \
+             customer_snapshot_address = ?, customer_snapshot_gstin = ?, \
+             business_snapshot_name = ?, business_snapshot_address = ?, business_snapshot_gstin = ?, \
+             business_snapshot_phone = ?, business_snapshot_email = ?, business_snapshot_bank_details = ?, \
+             business_snapshot_upi_id = ?, business_snapshot_logo_path = ?, \
+             is_interstate = ?, invoice_date = ?, due_date = ?, notes = ?, terms = ?, \
+             discount_type = ?, discount_value = ?, \
+             subtotal_minor = ?, discount_amount_minor = ?, tax_amount_minor = ?, total_minor = ?, \
+             updated_at = CURRENT_TIMESTAMP \
+             WHERE id = ?",
+        )
+        .bind(data.customer_id)
+        .bind(&data.customer_snapshot.name)
+        .bind(&data.customer_snapshot.phone)
+        .bind(&data.customer_snapshot.email)
+        .bind(&data.customer_snapshot.address)
+        .bind(&data.customer_snapshot.gstin)
+        .bind(&data.business_snapshot.name)
+        .bind(&data.business_snapshot.address)
+        .bind(&data.business_snapshot.gstin)
+        .bind(&data.business_snapshot.phone)
+        .bind(&data.business_snapshot.email)
+        .bind(&data.business_snapshot.bank_details)
+        .bind(&data.business_snapshot.upi_id)
+        .bind(&data.business_snapshot.logo_path)
+        .bind(data.is_interstate)
+        .bind(data.invoice_date)
+        .bind(data.due_date)
+        .bind(&data.notes)
+        .bind(&data.terms)
+        .bind(data.discount_type.map(DiscountType::as_db_str))
+        .bind(data.discount_value)
         .bind(data.subtotal_minor)
         .bind(data.discount_amount_minor)
         .bind(data.tax_amount_minor)

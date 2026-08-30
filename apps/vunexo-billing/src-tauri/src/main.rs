@@ -11,22 +11,31 @@ use tauri::Manager;
 
 use application::business::BusinessUseCases;
 use application::customers::CustomerUseCases;
+use application::dashboard::DashboardUseCases;
 use application::invoices::InvoiceUseCases;
+use application::payments::PaymentUseCases;
 use application::ports::business_repository::BusinessRepository;
 use application::ports::customer_repository::CustomerRepository;
+use application::ports::dashboard_repository::DashboardRepository;
 use application::ports::invoice_number_sequencer::InvoiceNumberSequencer;
 use application::ports::invoice_repository::InvoiceRepository;
+use application::ports::payment_repository::PaymentRepository;
 use application::ports::product_repository::ProductRepository;
 use application::ports::settings_repository::SettingsRepository;
+use application::ports::tax_rate_repository::TaxRateRepository;
 use application::ports::transaction::TransactionManager;
 use application::products::ProductUseCases;
 use application::settings::SettingsUseCases;
+use application::tax_rates::TaxRateUseCases;
 use infrastructure::database::sqlite_business_repository::SqliteBusinessRepository;
 use infrastructure::database::sqlite_customer_repository::SqliteCustomerRepository;
+use infrastructure::database::sqlite_dashboard_repository::SqliteDashboardRepository;
 use infrastructure::database::sqlite_invoice_number_sequencer::SqliteInvoiceNumberSequencer;
 use infrastructure::database::sqlite_invoice_repository::SqliteInvoiceRepository;
+use infrastructure::database::sqlite_payment_repository::SqlitePaymentRepository;
 use infrastructure::database::sqlite_product_repository::SqliteProductRepository;
 use infrastructure::database::sqlite_settings_repository::SqliteSettingsRepository;
+use infrastructure::database::sqlite_tax_rate_repository::SqliteTaxRateRepository;
 use infrastructure::database::transaction::SqlxTransactionManager;
 
 fn main() {
@@ -55,6 +64,12 @@ fn main() {
                 Arc::new(SqliteSettingsRepository::new(pool.clone()));
             let invoice_repo: Arc<dyn InvoiceRepository> =
                 Arc::new(SqliteInvoiceRepository::new(pool.clone()));
+            let payment_repo: Arc<dyn PaymentRepository> =
+                Arc::new(SqlitePaymentRepository::new(pool.clone()));
+            let tax_rate_repo: Arc<dyn TaxRateRepository> =
+                Arc::new(SqliteTaxRateRepository::new(pool.clone()));
+            let dashboard_repo: Arc<dyn DashboardRepository> =
+                Arc::new(SqliteDashboardRepository::new(pool.clone()));
             let sequencer: Arc<dyn InvoiceNumberSequencer> =
                 Arc::new(SqliteInvoiceNumberSequencer::new(pool));
 
@@ -72,6 +87,13 @@ fn main() {
                 invoice_repo.clone(),
                 tx_manager.clone(),
             ));
+            app.manage(PaymentUseCases::new(
+                payment_repo,
+                invoice_repo.clone(),
+                tx_manager.clone(),
+            ));
+            app.manage(TaxRateUseCases::new(tax_rate_repo, tx_manager.clone()));
+            app.manage(DashboardUseCases::new(dashboard_repo));
             app.manage(InvoiceUseCases::new(
                 invoice_repo,
                 customer_repo,
@@ -108,11 +130,20 @@ fn main() {
             commands::create_draft_invoice,
             commands::update_draft_invoice,
             commands::issue_invoice,
+            commands::edit_issued_invoice,
             commands::cancel_invoice,
             commands::delete_draft_invoice,
             commands::duplicate_invoice,
             commands::get_invoice,
             commands::list_invoices,
+            commands::record_payment,
+            commands::update_payment,
+            commands::delete_payment,
+            commands::list_payments_for_invoice,
+            commands::create_tax_rate,
+            commands::update_tax_rate,
+            commands::list_tax_rates,
+            commands::get_dashboard_metrics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running vunexo-billing");

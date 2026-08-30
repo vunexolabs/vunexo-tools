@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 import { ErrorBanner } from "../../components/ErrorBanner";
-import { formatMinorAsRupees, parseRupeesToMinor, type Product, type ProductFields } from "../../lib/tauri/types";
+import { useCurrency } from "../../hooks/useCurrency";
+import { useTaxRates } from "../../hooks/useTaxRates";
+import type { Product, ProductFields } from "../../lib/tauri/types";
 
 const EMPTY: ProductFields = {
   name: "",
@@ -35,9 +37,11 @@ export function ProductForm({
         }
       : EMPTY,
   );
-  const [priceInput, setPriceInput] = useState(initial ? formatMinorAsRupees(initial.price_minor) : "");
+  const { symbol, formatMinor, parseToMinor } = useCurrency();
+  const [priceInput, setPriceInput] = useState(initial ? formatMinor(initial.price_minor) : "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const { taxRates } = useTaxRates();
 
   const set = (key: "sku" | "description" | "hsn_sac_code") => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFields((f) => ({ ...f, [key]: e.target.value || null }));
@@ -47,7 +51,7 @@ export function ProductForm({
     setError(null);
     setSubmitting(true);
     try {
-      await onSubmit({ ...fields, price_minor: parseRupeesToMinor(priceInput) });
+      await onSubmit({ ...fields, price_minor: parseToMinor(priceInput) });
     } catch (err) {
       setError(err);
       setSubmitting(false);
@@ -77,7 +81,7 @@ export function ProductForm({
           />
         </label>
         <label className="block text-sm">
-          Price (₹) *
+          Price ({symbol}) *
           <input
             required
             inputMode="decimal"
@@ -98,6 +102,21 @@ export function ProductForm({
       <label className="block text-sm">
         HSN/SAC code
         <input defaultValue={fields.hsn_sac_code ?? ""} onChange={set("hsn_sac_code")} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2" />
+      </label>
+      <label className="block text-sm">
+        Tax rate
+        <select
+          value={fields.tax_rate_id ?? ""}
+          onChange={(e) => setFields((f) => ({ ...f, tax_rate_id: e.target.value ? Number(e.target.value) : null }))}
+          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+        >
+          <option value="">None</option>
+          {taxRates?.map((rate) => (
+            <option key={rate.id} value={rate.id}>
+              {rate.name}
+            </option>
+          ))}
+        </select>
       </label>
       <div className="flex gap-2">
         <button

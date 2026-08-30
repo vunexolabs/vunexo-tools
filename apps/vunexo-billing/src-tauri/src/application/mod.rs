@@ -4,10 +4,13 @@
 
 pub mod business;
 pub mod customers;
+pub mod dashboard;
 pub mod error;
 pub mod invoices;
+pub mod payments;
 pub mod ports;
 pub mod products;
 pub mod settings;
+pub mod tax_rates;
 
 pub use error::ApplicationError;

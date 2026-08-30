@@ -74,31 +74,55 @@ export interface ProductFilter {
 }
 
 /**
- * Parses a user-typed rupee amount (e.g. "1234.5") into minor units (paise)
- * using integer string arithmetic only — no floating point, per the money
- * rules in .ai/product.md, even for this simple a conversion.
+ * Parses a user-typed amount (e.g. "1234.5") into minor units using integer
+ * string arithmetic only — no floating point, per the money rules in
+ * .ai/product.md — scaled to `decimals` places (a currency's ISO 4217 minor
+ * -unit exponent, `lib/currency.ts`) rather than hardcoded to 2 (paise).
+ * Screens should generally go through `useCurrency()`'s `parseToMinor`
+ * instead of calling this directly, so the active currency's scale is
+ * always applied consistently.
  */
-export function parseRupeesToMinor(input: string): number {
+export function parseAmountToMinor(input: string, decimals: number): number {
   const trimmed = input.trim();
   if (trimmed === "" || trimmed === "-") return 0;
   const negative = trimmed.startsWith("-");
   const unsigned = negative ? trimmed.slice(1) : trimmed;
   const [wholePartRaw, fracPartRaw = ""] = unsigned.split(".");
   const wholePart = wholePartRaw === "" ? "0" : wholePartRaw;
-  const fracPart = (fracPartRaw + "00").slice(0, 2);
-  const minor = parseInt(wholePart, 10) * 100 + parseInt(fracPart, 10);
+  const scale = 10 ** decimals;
+  const fracPart = decimals === 0 ? "" : (fracPartRaw + "0".repeat(decimals)).slice(0, decimals);
+  const minor = parseInt(wholePart, 10) * scale + (fracPart === "" ? 0 : parseInt(fracPart, 10));
   return negative ? -minor : minor;
 }
 
-export function formatMinorAsRupees(minor: number): string {
+/** See `parseAmountToMinor` — prefer `useCurrency()`'s `formatMinor` at call sites. */
+export function formatMinorAsAmount(minor: number, decimals: number): string {
   const negative = minor < 0;
   const abs = Math.abs(minor);
-  const whole = Math.floor(abs / 100);
-  const frac = abs % 100;
-  return `${negative ? "-" : ""}${whole}.${frac.toString().padStart(2, "0")}`;
+  const scale = 10 ** decimals;
+  const whole = Math.floor(abs / scale);
+  if (decimals === 0) return `${negative ? "-" : ""}${whole}`;
+  const frac = abs % scale;
+  return `${negative ? "-" : ""}${whole}.${frac.toString().padStart(decimals, "0")}`;
 }
 
-/** Same integer-string-only approach as parseRupeesToMinor, scaled to 3 decimal places (calculation-engine.md §1's quantity_thousandths). */
+/**
+ * database-schema.md §6 / calculation-engine.md §5 — CGST/SGST vs IGST is a
+ * *display* split of the already-final, backend-computed `tax_amount_minor`,
+ * never a separately stored or separately calculated figure. This mirrors
+ * `domain::calculation::split_gst` in the Rust backend exactly (integer
+ * halving, no rounding judgment call), so the one narrow exception to "the
+ * frontend never calculates financial totals" is a derivation with only one
+ * possible correct answer, not a place the two sides of the app could
+ * disagree.
+ */
+export function splitGst(taxAmountMinor: number, isInterstate: boolean): { cgst: number; sgst: number; igst: number } {
+  if (isInterstate) return { igst: taxAmountMinor, cgst: 0, sgst: 0 };
+  const cgst = Math.floor(taxAmountMinor / 2);
+  return { igst: 0, cgst, sgst: taxAmountMinor - cgst };
+}
+
+/** Same integer-string-only approach as parseAmountToMinor, scaled to 3 decimal places (calculation-engine.md §1's quantity_thousandths). */
 export function parseQuantityToThousandths(input: string): number {
   const trimmed = input.trim();
   if (trimmed === "") return 0;
@@ -148,6 +172,17 @@ export interface SettingsFields {
   invoice_number_format: string;
   default_due_days: number;
   default_tax_rate_id: number | null;
+}
+
+export interface TaxRate {
+  id: number;
+  name: string;
+  rate_basis_points: number;
+}
+
+export interface TaxRateFields {
+  name: string;
+  rate_basis_points: number;
 }
 
 export type InvoiceStatus = "DRAFT" | "ISSUED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
@@ -236,6 +271,20 @@ export interface InvoiceSummary {
   is_overdue: boolean;
 }
 
+export interface OverdueSummary {
+  count: number;
+  total_minor: number;
+}
+
+export interface DashboardMetrics {
+  today_sales_minor: number;
+  month_sales_minor: number;
+  outstanding_total_minor: number;
+  paid_total_minor: number;
+  overdue: OverdueSummary;
+  recent_invoices: InvoiceSummary[];
+}
+
 export interface DraftInvoiceInput {
   customer_id: number | null;
   invoice_date: string;
@@ -250,6 +299,34 @@ export interface DraftInvoiceInput {
 
 export interface InvoiceFilter {
   status: InvoiceStatus | null;
+}
+
+export type PaymentMethod = "CASH" | "BANK_TRANSFER" | "UPI" | "CHEQUE" | "OTHER";
+
+export interface Payment {
+  id: number;
+  invoice_id: number;
+  amount_minor: number;
+  method: PaymentMethod;
+  paid_on: string;
+  reference: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewPayment {
+  invoice_id: number;
+  amount_minor: number;
+  method: PaymentMethod;
+  paid_on: string;
+  reference: string | null;
+}
+
+export interface PaymentFields {
+  amount_minor: number;
+  method: PaymentMethod;
+  paid_on: string;
+  reference: string | null;
 }
 
 /** application-architecture.md §6 — the shape every command error rejects with. */

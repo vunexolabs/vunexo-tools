@@ -1,19 +1,21 @@
 import { useState } from "react";
 import { BusinessSetup } from "../features/settings/BusinessSetup";
 import { CustomersList } from "../features/customers/CustomersList";
+import { Dashboard } from "../features/dashboard/Dashboard";
 import { InvoiceEditor } from "../features/invoices/InvoiceEditor";
 import { InvoicesList } from "../features/invoices/InvoicesList";
 import { ProductsList } from "../features/products/ProductsList";
+import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { useBusiness } from "../hooks/useBusiness";
 
 type Section = "dashboard" | "invoices" | "customers" | "products" | "settings";
 
 const SECTIONS: { id: Section; label: string; implemented: boolean }[] = [
-  { id: "dashboard", label: "Dashboard", implemented: false },
+  { id: "dashboard", label: "Dashboard", implemented: true },
   { id: "invoices", label: "Invoices", implemented: true },
   { id: "customers", label: "Customers", implemented: true },
   { id: "products", label: "Products", implemented: true },
-  { id: "settings", label: "Settings", implemented: false },
+  { id: "settings", label: "Settings", implemented: true },
 ];
 
 /**
@@ -23,7 +25,7 @@ const SECTIONS: { id: Section; label: string; implemented: boolean }[] = [
  */
 export function App() {
   const { business, create } = useBusiness();
-  const [section, setSection] = useState<Section>("invoices");
+  const [section, setSection] = useState<Section>("dashboard");
   const [openInvoiceId, setOpenInvoiceId] = useState<number | null>(null);
 
   if (business === undefined) {
@@ -65,14 +67,23 @@ export function App() {
         </ul>
       </nav>
       <main className="flex-1 p-8">
+        {section === "dashboard" && (
+          <Dashboard
+            onOpenInvoice={(id) => {
+              setSection("invoices");
+              setOpenInvoiceId(id);
+            }}
+          />
+        )}
         {section === "invoices" &&
           (openInvoiceId === null ? (
             <InvoicesList onOpen={setOpenInvoiceId} />
           ) : (
-            <InvoiceEditor invoiceId={openInvoiceId} onBack={() => setOpenInvoiceId(null)} />
+            <InvoiceEditor invoiceId={openInvoiceId} onBack={() => setOpenInvoiceId(null)} onOpenInvoice={setOpenInvoiceId} />
           ))}
         {section === "customers" && <CustomersList />}
         {section === "products" && <ProductsList />}
+        {section === "settings" && <SettingsScreen />}
       </main>
     </div>
   );

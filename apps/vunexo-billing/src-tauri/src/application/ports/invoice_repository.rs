@@ -5,8 +5,8 @@
 use async_trait::async_trait;
 
 use crate::domain::invoice::{
-    DraftInvoiceToSave, InvoiceFilter, InvoiceStatus, InvoiceSummary, InvoiceWithLineItems,
-    IssueInvoiceData,
+    DraftInvoiceToSave, EditIssuedInvoiceData, InvoiceFilter, InvoiceStatus, InvoiceSummary,
+    InvoiceWithLineItems, IssueInvoiceData,
 };
 
 use super::infrastructure_error::InfrastructureError;
@@ -36,6 +36,16 @@ pub trait InvoiceRepository: Send + Sync {
         data: IssueInvoiceData,
     ) -> Result<InvoiceWithLineItems, InfrastructureError>;
 
+    /// Preconditions (status ∈ {Issued, PartiallyPaid, Paid}) are the use
+    /// case's job — see application-architecture.md §4. Never touches
+    /// `payments`, `status`, or the invoice number.
+    async fn update_issued(
+        &self,
+        tx: &mut dyn Transaction,
+        id: i64,
+        data: EditIssuedInvoiceData,
+    ) -> Result<InvoiceWithLineItems, InfrastructureError>;
+
     async fn cancel(
         &self,
         tx: &mut dyn Transaction,
@@ -43,10 +53,7 @@ pub trait InvoiceRepository: Send + Sync {
         reason: Option<String>,
     ) -> Result<(), InfrastructureError>;
 
-    /// Used only by the payment recalculation step (a later slice) — kept
-    /// here now so the port shape matches application-architecture.md §3b
-    /// exactly, even before anything calls it.
-    #[allow(dead_code)]
+    /// Used only by the payment recalculation step — application/payments.rs.
     async fn set_status(
         &self,
         tx: &mut dyn Transaction,

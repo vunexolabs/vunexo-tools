@@ -1,38 +1,63 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { Modal } from "../../components/Modal";
+import { SearchablePicker } from "../../components/SearchablePicker";
 import { StatusBadge } from "../../components/StatusBadge";
+import { CustomerForm } from "../customers/CustomerForm";
+import { PaymentPanel } from "../payments/PaymentPanel";
+import { ProductForm } from "../products/ProductForm";
 import {
+  cancelInvoice,
+  createCustomer,
+  createProduct,
+  duplicateInvoice,
+  editIssuedInvoice,
   getInvoice,
+  getSettings,
   issueInvoice,
   listCustomers,
   listProducts,
+  listTaxRates,
   previewNextInvoiceNumber,
   updateDraftInvoice,
 } from "../../lib/tauri/commands";
+import { useCurrency } from "../../hooks/useCurrency";
 import {
-  formatMinorAsRupees,
   formatThousandthsAsQuantity,
   formatBasisPointsAsPercent,
   parsePercentToBasisPoints,
   parseQuantityToThousandths,
-  parseRupeesToMinor,
+  splitGst,
   type CustomerListItem,
   type DraftInvoiceInput,
   type InvoiceWithLineItems,
   type ProductListItem,
+  type TaxRate,
 } from "../../lib/tauri/types";
+
+/** Resolves a tax rate id against the loaded list, falling back to "no tax rate" if it's gone. */
+function resolveTaxRate(taxRates: TaxRate[], taxRateId: number | null): { taxRateId: number | null; taxStr: string } {
+  const rate = taxRateId === null ? undefined : taxRates.find((r) => r.id === taxRateId);
+  return rate ? { taxRateId: rate.id, taxStr: formatBasisPointsAsPercent(rate.rate_basis_points) } : { taxRateId: null, taxStr: "0" };
+}
 
 /**
  * ui-ux.md §4 — one component for create/edit-draft/view-issued, not three
- * screens; the fields/footer just change by `status`.
+ * screens; the fields/footer just change by `status`. `Issued`/
+ * `PartiallyPaid`/`Paid` are all fully editable (user-flows.md's "Editing
+ * an issued invoice" rule) via `edit_issued_invoice`, which re-snapshots
+ * customer/business fresh at every save; only `CANCELLED` is read-only.
  *
  * Scope simplification versus the full spec: line-level discounts aren't
  * exposed in this editor (only the invoice-level discount) — the calculation
  * engine already supports them (calculation-engine.md §4 Step 2), this is a
- * UI-only trim to keep the first working editor small. Recalculation
- * happens on explicit "Save Draft", not on every keystroke — still nothing
- * is computed client-side (application-architecture.md §4a), it's just not
- * as continuously live as the full ui-ux.md vision describes.
+ * UI-only trim to keep the editor small.
+ *
+ * Totals are still never computed client-side (application-architecture.md
+ * §4a) — every line/discount edit debounces a real save call and re-renders
+ * whatever the backend returns, so it *feels* live without moving the
+ * arithmetic into React.
  */
 
 interface EditableLine {
@@ -42,6 +67,7 @@ interface EditableLine {
   unit: string;
   quantityStr: string;
   priceStr: string;
+  taxRateId: number | null;
   taxStr: string;
 }
 
@@ -51,25 +77,62 @@ function newKey() {
   return `line-${keyCounter}`;
 }
 
-function toEditableLines(invoice: InvoiceWithLineItems): EditableLine[] {
-  return invoice.line_items.map((li) => ({
-    key: newKey(),
+// These three run outside the component (no hooks allowed), so the active
+// currency's formatter is threaded through as a parameter rather than read
+// via `useCurrency()` directly.
+function toEditableLine(li: InvoiceWithLineItems["line_items"][number], key: string, formatMinor: (m: number) => string): EditableLine {
+  return {
+    key,
     product_id: li.product_id,
     description: li.description,
     unit: li.unit,
     quantityStr: formatThousandthsAsQuantity(li.quantity_thousandths),
-    priceStr: formatMinorAsRupees(li.unit_price_minor),
+    priceStr: formatMinor(li.unit_price_minor),
+    taxRateId: li.tax_rate_id,
     taxStr: formatBasisPointsAsPercent(li.tax_rate_basis_points),
-  }));
+  };
 }
 
-export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack: () => void }) {
+function toEditableLines(invoice: InvoiceWithLineItems, formatMinor: (m: number) => string): EditableLine[] {
+  return invoice.line_items.map((li) => toEditableLine(li, newKey(), formatMinor));
+}
+
+/**
+ * Same shape as `toEditableLines`, but reuses each line's existing `key`
+ * (by position — the calculation engine preserves input order) instead of
+ * minting new ones. Used after an autosave round-trip so React doesn't
+ * remount every row and steal focus mid-edit.
+ */
+function mergeEditableLines(prevLines: EditableLine[], invoice: InvoiceWithLineItems, formatMinor: (m: number) => string): EditableLine[] {
+  return invoice.line_items.map((li, i) => toEditableLine(li, prevLines[i]?.key ?? newKey(), formatMinor));
+}
+
+const AUTOSAVE_DEBOUNCE_MS = 600;
+
+export function InvoiceEditor({
+  invoiceId,
+  onBack,
+  onOpenInvoice,
+}: {
+  invoiceId: number;
+  onBack: () => void;
+  onOpenInvoice: (id: number) => void;
+}) {
+  const { symbol, formatMinor, parseToMinor } = useCurrency();
   const [invoice, setInvoice] = useState<InvoiceWithLineItems | null>(null);
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
   const [products, setProducts] = useState<ProductListItem[]>([]);
+  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
+  const [defaultTaxRateId, setDefaultTaxRateId] = useState<number | null>(null);
   const [numberPreview, setNumberPreview] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
+  const [newProductForLineKey, setNewProductForLineKey] = useState<string | null>(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [duplicating, setDuplicating] = useState(false);
 
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [invoiceDate, setInvoiceDate] = useState("");
@@ -88,11 +151,15 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
       getInvoice(invoiceId),
       listCustomers({ include_archived: false }),
       listProducts({ include_archived: false }),
+      listTaxRates(),
+      getSettings(),
     ])
-      .then(([inv, custs, prods]) => {
+      .then(([inv, custs, prods, rates, settings]) => {
         setInvoice(inv);
         setCustomers(custs);
         setProducts(prods);
+        setTaxRates(rates);
+        setDefaultTaxRateId(settings.default_tax_rate_id);
         setCustomerId(inv.customer_id);
         setInvoiceDate(inv.invoice_date);
         setDueDate(inv.due_date);
@@ -105,15 +172,84 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
             ? ""
             : inv.discount_type === "PERCENTAGE"
               ? formatBasisPointsAsPercent(inv.discount_value)
-              : formatMinorAsRupees(inv.discount_value),
+              : formatMinor(inv.discount_value),
         );
-        setLines(toEditableLines(inv));
+        setLines(toEditableLines(inv, formatMinor));
         if (inv.status === "DRAFT") {
           previewNextInvoiceNumber().then(setNumberPreview).catch(() => setNumberPreview(null));
         }
       })
       .catch((err: unknown) => setError(err));
-  }, [invoiceId]);
+  }, [invoiceId, formatMinor]);
+
+  // Keeps a stable pointer to "build the input from whatever the state is
+  // *right now*" — read by the debounced autosave below, which fires well
+  // after the keystroke that scheduled it, so it must never close over a
+  // stale render's values (see buildInputRef usage below).
+  const buildInput = (): DraftInvoiceInput => ({
+    customer_id: customerId,
+    invoice_date: invoiceDate,
+    due_date: dueDate,
+    notes: notes || null,
+    terms: terms || null,
+    is_interstate: isInterstate,
+    discount_type: discountStr.trim() === "" ? null : discountIsPercentage ? "PERCENTAGE" : "AMOUNT",
+    discount_value:
+      discountStr.trim() === ""
+        ? null
+        : discountIsPercentage
+          ? parsePercentToBasisPoints(discountStr)
+          : parseToMinor(discountStr),
+    line_items: lines.map((l) => ({
+      product_id: l.product_id,
+      description: l.description,
+      unit: l.unit,
+      quantity_thousandths: parseQuantityToThousandths(l.quantityStr),
+      unit_price_minor: parseToMinor(l.priceStr),
+      line_discount_type: null,
+      line_discount_value: null,
+      tax_rate_id: l.taxRateId,
+      tax_rate_basis_points: parsePercentToBasisPoints(l.taxStr),
+    })),
+  });
+  const buildInputRef = useRef(buildInput);
+  buildInputRef.current = buildInput;
+
+  // Draft saves go through `update_draft_invoice`; Issued/PartiallyPaid/Paid
+  // go through `edit_issued_invoice` instead (the backend rejects the wrong
+  // one for the wrong status) — this is the one place that branch lives, so
+  // autosave, "Save Draft", and "Save Changes" can't drift apart.
+  const persistRef = useRef(invoice);
+  persistRef.current = invoice;
+  const saveNow = (input: DraftInvoiceInput) => {
+    const status = persistRef.current?.status;
+    return status === "DRAFT" ? updateDraftInvoice(invoiceId, input) : editIssuedInvoice(invoiceId, input);
+  };
+
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, []);
+
+  const runAutosave = async () => {
+    setAutoSaving(true);
+    try {
+      const updated = await saveNow(buildInputRef.current());
+      setInvoice(updated);
+      setLines((prev) => mergeEditableLines(prev, updated, formatMinor));
+    } catch (err) {
+      setError(err);
+    } finally {
+      setAutoSaving(false);
+    }
+  };
+
+  const scheduleAutosave = () => {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => void runAutosave(), AUTOSAVE_DEBOUNCE_MS);
+  };
 
   if (!invoice) {
     return (
@@ -128,57 +264,70 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
   }
 
   const isDraft = invoice.status === "DRAFT";
+  const isCancelled = invoice.status === "CANCELLED";
+  const isEditable = !isCancelled;
 
-  const addLine = () => setLines((ls) => [...ls, { key: newKey(), product_id: null, description: "", unit: "", quantityStr: "1", priceStr: "0", taxStr: "0" }]);
-  const removeLine = (key: string) => setLines((ls) => ls.filter((l) => l.key !== key));
-  const updateLine = (key: string, patch: Partial<EditableLine>) =>
+  // ui-ux.md §3: a payment mutation changes the invoice's `status` as a side
+  // effect the payment panel itself doesn't return inline — refetch here so
+  // the status badge and totals stay in sync without a manual refresh.
+  const reloadInvoiceAfterPaymentChange = () => {
+    getInvoice(invoiceId)
+      .then((inv) => {
+        setInvoice(inv);
+        setLines(toEditableLines(inv, formatMinor));
+      })
+      .catch((err: unknown) => setError(err));
+  };
+
+  const addLine = () => {
+    setLines((ls) => [
+      ...ls,
+      {
+        key: newKey(),
+        product_id: null,
+        description: "",
+        unit: "",
+        quantityStr: "1",
+        priceStr: "0",
+        ...resolveTaxRate(taxRates, defaultTaxRateId),
+      },
+    ]);
+    scheduleAutosave();
+  };
+  const removeLine = (key: string) => {
+    setLines((ls) => ls.filter((l) => l.key !== key));
+    scheduleAutosave();
+  };
+  const updateLine = (key: string, patch: Partial<EditableLine>) => {
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+    scheduleAutosave();
+  };
 
-  const pickProduct = (key: string, productId: number) => {
-    const product = products.find((p) => p.id === productId);
-    if (!product) return;
+  // A picked product's own tax rate wins; if it has none, fall back to the
+  // business's configured default (Settings → Invoicing) rather than
+  // silently dropping to 0%.
+  const applyProduct = (key: string, product: ProductListItem) => {
     updateLine(key, {
       product_id: product.id,
       description: product.name,
       unit: product.unit,
-      priceStr: formatMinorAsRupees(product.price_minor),
+      priceStr: formatMinor(product.price_minor),
+      ...resolveTaxRate(taxRates, product.tax_rate_id ?? defaultTaxRateId),
     });
   };
+  const pickProduct = (key: string, productId: number) => {
+    const product = products.find((p) => p.id === productId);
+    if (product) applyProduct(key, product);
+  };
 
-  const buildInput = (): DraftInvoiceInput => ({
-    customer_id: customerId,
-    invoice_date: invoiceDate,
-    due_date: dueDate,
-    notes: notes || null,
-    terms: terms || null,
-    is_interstate: isInterstate,
-    discount_type: discountStr.trim() === "" ? null : discountIsPercentage ? "PERCENTAGE" : "AMOUNT",
-    discount_value:
-      discountStr.trim() === ""
-        ? null
-        : discountIsPercentage
-          ? parsePercentToBasisPoints(discountStr)
-          : parseRupeesToMinor(discountStr),
-    line_items: lines.map((l) => ({
-      product_id: l.product_id,
-      description: l.description,
-      unit: l.unit,
-      quantity_thousandths: parseQuantityToThousandths(l.quantityStr),
-      unit_price_minor: parseRupeesToMinor(l.priceStr),
-      line_discount_type: null,
-      line_discount_value: null,
-      tax_rate_id: null,
-      tax_rate_basis_points: parsePercentToBasisPoints(l.taxStr),
-    })),
-  });
-
-  const handleSaveDraft = async () => {
+  const handleSave = async () => {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     setError(null);
     setSaving(true);
     try {
-      const updated = await updateDraftInvoice(invoice.id, buildInput());
+      const updated = await saveNow(buildInput());
       setInvoice(updated);
-      setLines(toEditableLines(updated));
+      setLines((prev) => mergeEditableLines(prev, updated, formatMinor));
     } catch (err) {
       setError(err);
     } finally {
@@ -187,17 +336,30 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
   };
 
   const handleIssue = async () => {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     setError(null);
     setSaving(true);
     try {
       await updateDraftInvoice(invoice.id, buildInput());
       const issued = await issueInvoice(invoice.id, useCustomNumber && customNumber.trim() !== "" ? customNumber.trim() : null);
       setInvoice(issued);
-      setLines(toEditableLines(issued));
+      setLines(toEditableLines(issued, formatMinor));
     } catch (err) {
       setError(err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDuplicate = async () => {
+    setError(null);
+    setDuplicating(true);
+    try {
+      const dup = await duplicateInvoice(invoice.id);
+      onOpenInvoice(dup.id);
+    } catch (err) {
+      setError(err);
+      setDuplicating(false);
     }
   };
 
@@ -214,27 +376,30 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
 
       <ErrorBanner error={error} />
 
-      {invoice.status === "CANCELLED" && invoice.cancel_reason && (
-        <p className="text-sm text-slate-500">Cancelled: {invoice.cancel_reason}</p>
+      {isCancelled && (
+        <p className="text-sm text-slate-500">Cancelled{invoice.cancel_reason ? `: ${invoice.cancel_reason}` : "."}</p>
       )}
 
       <div className="grid grid-cols-2 gap-4 rounded border border-slate-700 bg-slate-900 p-4">
-        <label className="block text-sm">
-          Customer
-          <select
-            disabled={!isDraft}
-            value={customerId ?? ""}
-            onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : null)}
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60"
-          >
-            <option value="">Select customer…</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div>
+          <label className="block text-sm">Customer</label>
+          {isEditable ? (
+            <SearchablePicker
+              className="mt-1"
+              items={customers.map((c) => ({ id: c.id, label: c.name }))}
+              value={customerId}
+              onChange={(id) => {
+                setCustomerId(id);
+                scheduleAutosave();
+              }}
+              placeholder="Search or select customer…"
+              createLabel="Create new customer…"
+              onCreateNew={() => setShowNewCustomerModal(true)}
+            />
+          ) : (
+            <p className="mt-1 text-sm text-slate-400">{invoice.customer_snapshot_name ?? "—"}</p>
+          )}
+        </div>
 
         <div>
           {isDraft ? (
@@ -268,9 +433,12 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
           Invoice date
           <input
             type="date"
-            disabled={!isDraft}
+            disabled={!isEditable}
             value={invoiceDate}
-            onChange={(e) => setInvoiceDate(e.target.value)}
+            onChange={(e) => {
+              setInvoiceDate(e.target.value);
+              scheduleAutosave();
+            }}
             className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60"
           />
         </label>
@@ -278,15 +446,26 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
           Due date
           <input
             type="date"
-            disabled={!isDraft}
+            disabled={!isEditable}
             value={dueDate ?? ""}
-            onChange={(e) => setDueDate(e.target.value || null)}
+            onChange={(e) => {
+              setDueDate(e.target.value || null);
+              scheduleAutosave();
+            }}
             className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60"
           />
         </label>
 
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" disabled={!isDraft} checked={isInterstate} onChange={(e) => setIsInterstate(e.target.checked)} />
+          <input
+            type="checkbox"
+            disabled={!isEditable}
+            checked={isInterstate}
+            onChange={(e) => {
+              setIsInterstate(e.target.checked);
+              scheduleAutosave();
+            }}
+          />
           Interstate (IGST instead of CGST+SGST)
         </label>
       </div>
@@ -298,29 +477,25 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
               <th className="pb-2">Item</th>
               <th className="pb-2">Unit</th>
               <th className="pb-2">Qty</th>
-              <th className="pb-2">Rate (₹)</th>
+              <th className="pb-2">Rate ({symbol})</th>
               <th className="pb-2">Tax %</th>
-              {isDraft && <th className="pb-2"></th>}
+              {isEditable && <th className="pb-2"></th>}
             </tr>
           </thead>
           <tbody>
             {lines.map((l) => (
               <tr key={l.key} className="border-t border-slate-800">
                 <td className="py-2 pr-2">
-                  {isDraft ? (
+                  {isEditable ? (
                     <div className="space-y-1">
-                      <select
-                        value={l.product_id ?? ""}
-                        onChange={(e) => e.target.value && pickProduct(l.key, Number(e.target.value))}
-                        className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
-                      >
-                        <option value="">Pick a product…</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
+                      <SearchablePicker
+                        items={products.map((p) => ({ id: p.id, label: p.name }))}
+                        value={l.product_id}
+                        onChange={(id) => pickProduct(l.key, id)}
+                        placeholder="Pick a product…"
+                        createLabel="Create new product…"
+                        onCreateNew={() => setNewProductForLineKey(l.key)}
+                      />
                       <input
                         value={l.description}
                         onChange={(e) => updateLine(l.key, { description: e.target.value })}
@@ -333,34 +508,62 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
                   )}
                 </td>
                 <td className="py-2 pr-2">
-                  {isDraft ? (
+                  {isEditable ? (
                     <input value={l.unit} onChange={(e) => updateLine(l.key, { unit: e.target.value })} className="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1" />
                   ) : (
                     l.unit
                   )}
                 </td>
                 <td className="py-2 pr-2">
-                  {isDraft ? (
+                  {isEditable ? (
                     <input value={l.quantityStr} onChange={(e) => updateLine(l.key, { quantityStr: e.target.value })} className="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1" />
                   ) : (
                     l.quantityStr
                   )}
                 </td>
                 <td className="py-2 pr-2">
-                  {isDraft ? (
+                  {isEditable ? (
                     <input value={l.priceStr} onChange={(e) => updateLine(l.key, { priceStr: e.target.value })} className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1" />
                   ) : (
-                    `₹${l.priceStr}`
+                    `${symbol}${l.priceStr}`
                   )}
                 </td>
                 <td className="py-2 pr-2">
-                  {isDraft ? (
-                    <input value={l.taxStr} onChange={(e) => updateLine(l.key, { taxStr: e.target.value })} className="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+                  {isEditable ? (
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={l.taxRateId ?? "custom"}
+                        onChange={(e) => {
+                          if (e.target.value === "custom") {
+                            updateLine(l.key, { taxRateId: null });
+                            return;
+                          }
+                          const rate = taxRates.find((r) => r.id === Number(e.target.value));
+                          if (rate) updateLine(l.key, resolveTaxRate(taxRates, rate.id));
+                        }}
+                        className="w-24 rounded border border-slate-700 bg-slate-950 px-1 py-1 text-xs"
+                      >
+                        {taxRates.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                        ))}
+                        <option value="custom">Custom %</option>
+                      </select>
+                      {l.taxRateId === null && (
+                        <input
+                          value={l.taxStr}
+                          onChange={(e) => updateLine(l.key, { taxStr: e.target.value })}
+                          placeholder="%"
+                          className="w-12 rounded border border-slate-700 bg-slate-950 px-2 py-1"
+                        />
+                      )}
+                    </div>
                   ) : (
-                    l.taxStr
+                    `${l.taxStr}%`
                   )}
                 </td>
-                {isDraft && (
+                {isEditable && (
                   <td className="py-2">
                     <button onClick={() => removeLine(l.key)} className="text-red-400 hover:underline">
                       Remove
@@ -371,7 +574,7 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
             ))}
           </tbody>
         </table>
-        {isDraft && (
+        {isEditable && (
           <button onClick={addLine} className="mt-2 text-sm text-sky-400 hover:underline">
             + Add item
           </button>
@@ -382,63 +585,98 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
         <div className="space-y-2 rounded border border-slate-700 bg-slate-900 p-4">
           <label className="block text-sm">
             Discount
-            {isDraft ? (
+            {isEditable ? (
               <div className="mt-1 flex gap-2">
                 <select
                   value={discountIsPercentage ? "PERCENTAGE" : "AMOUNT"}
-                  onChange={(e) => setDiscountIsPercentage(e.target.value === "PERCENTAGE")}
+                  onChange={(e) => {
+                    setDiscountIsPercentage(e.target.value === "PERCENTAGE");
+                    scheduleAutosave();
+                  }}
                   className="rounded border border-slate-700 bg-slate-950 px-2 py-2 text-sm"
                 >
-                  <option value="AMOUNT">₹ Amount</option>
+                  <option value="AMOUNT">{symbol} Amount</option>
                   <option value="PERCENTAGE">% Percentage</option>
                 </select>
                 <input
                   value={discountStr}
-                  onChange={(e) => setDiscountStr(e.target.value)}
+                  onChange={(e) => {
+                    setDiscountStr(e.target.value);
+                    scheduleAutosave();
+                  }}
                   placeholder="0"
                   className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
                 />
               </div>
             ) : (
-              <p className="text-slate-400">{discountStr === "" ? "None" : `${discountIsPercentage ? `${discountStr}%` : `₹${discountStr}`}`}</p>
+              <p className="text-slate-400">{discountStr === "" ? "None" : `${discountIsPercentage ? `${discountStr}%` : `${symbol}${discountStr}`}`}</p>
             )}
           </label>
           <label className="block text-sm">
             Notes
-            <textarea disabled={!isDraft} value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60" />
+            <textarea
+              disabled={!isEditable}
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                scheduleAutosave();
+              }}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60"
+            />
           </label>
           <label className="block text-sm">
             Terms
-            <textarea disabled={!isDraft} value={terms} onChange={(e) => setTerms(e.target.value)} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60" />
+            <textarea
+              disabled={!isEditable}
+              value={terms}
+              onChange={(e) => {
+                setTerms(e.target.value);
+                scheduleAutosave();
+              }}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60"
+            />
           </label>
         </div>
 
         <div className="space-y-1 rounded border border-slate-700 bg-slate-900 p-4 text-sm">
           <div className="flex justify-between">
             <span className="text-slate-400">Subtotal</span>
-            <span>₹{formatMinorAsRupees(invoice.subtotal_minor)}</span>
+            <span>{symbol}{formatMinor(invoice.subtotal_minor)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Discount</span>
-            <span>-₹{formatMinorAsRupees(invoice.discount_amount_minor)}</span>
+            <span>-{symbol}{formatMinor(invoice.discount_amount_minor)}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-slate-400">Tax</span>
-            <span>+₹{formatMinorAsRupees(invoice.tax_amount_minor)}</span>
-          </div>
+          {invoice.is_interstate ? (
+            <div className="flex justify-between">
+              <span className="text-slate-400">IGST</span>
+              <span>+{symbol}{formatMinor(splitGst(invoice.tax_amount_minor, true).igst)}</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <span className="text-slate-400">CGST</span>
+                <span>+{symbol}{formatMinor(splitGst(invoice.tax_amount_minor, false).cgst)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">SGST</span>
+                <span>+{symbol}{formatMinor(splitGst(invoice.tax_amount_minor, false).sgst)}</span>
+              </div>
+            </>
+          )}
           <div className="mt-2 flex justify-between border-t border-slate-700 pt-2 text-base font-semibold">
             <span>Total</span>
-            <span>₹{formatMinorAsRupees(invoice.total_minor)}</span>
+            <span>{symbol}{formatMinor(invoice.total_minor)}</span>
           </div>
-          <p className="pt-2 text-xs text-slate-500">
-            Totals shown are what the backend last computed — click "Save Draft" to recalculate after editing.
-          </p>
+          {isEditable && (
+            <p className="pt-2 text-xs text-slate-500">{autoSaving ? "Recalculating totals…" : "Totals update automatically as you edit."}</p>
+          )}
         </div>
       </div>
 
       {isDraft && (
         <div className="flex gap-2">
-          <button onClick={handleSaveDraft} disabled={saving} className="rounded bg-slate-700 px-4 py-2 font-medium disabled:opacity-50">
+          <button onClick={handleSave} disabled={saving} className="rounded bg-slate-700 px-4 py-2 font-medium disabled:opacity-50">
             {saving ? "Saving…" : "Save Draft"}
           </button>
           <button
@@ -449,6 +687,100 @@ export function InvoiceEditor({ invoiceId, onBack }: { invoiceId: number; onBack
             {saving ? "Issuing…" : "Issue"}
           </button>
         </div>
+      )}
+
+      {!isDraft && !isCancelled && (
+        <div className="flex gap-2">
+          <button onClick={handleSave} disabled={saving} className="rounded bg-slate-700 px-4 py-2 font-medium disabled:opacity-50">
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+          <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50">
+            {duplicating ? "Duplicating…" : "Duplicate"}
+          </button>
+          <button
+            onClick={() => {
+              setCancelReason("");
+              setShowCancelDialog(true);
+            }}
+            className="rounded border border-amber-700 px-4 py-2 font-medium text-amber-400"
+          >
+            Cancel Invoice
+          </button>
+        </div>
+      )}
+
+      {isCancelled && (
+        <div className="flex gap-2">
+          <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50">
+            {duplicating ? "Duplicating…" : "Duplicate"}
+          </button>
+        </div>
+      )}
+
+      {!isDraft && (
+        <PaymentPanel
+          invoiceId={invoice.id}
+          invoiceStatus={invoice.status}
+          totalMinor={invoice.total_minor}
+          onChanged={reloadInvoiceAfterPaymentChange}
+        />
+      )}
+
+      {showNewCustomerModal && (
+        <Modal onClose={() => setShowNewCustomerModal(false)}>
+          <CustomerForm
+            onCancel={() => setShowNewCustomerModal(false)}
+            onSubmit={async (fields) => {
+              const created = await createCustomer(fields);
+              setCustomers((cs) => [...cs, { ...created, has_invoices: false }]);
+              setCustomerId(created.id);
+              setShowNewCustomerModal(false);
+              scheduleAutosave();
+              return created;
+            }}
+          />
+        </Modal>
+      )}
+
+      {newProductForLineKey !== null && (
+        <Modal onClose={() => setNewProductForLineKey(null)}>
+          <ProductForm
+            onCancel={() => setNewProductForLineKey(null)}
+            onSubmit={async (fields) => {
+              const created = await createProduct(fields);
+              setProducts((ps) => [...ps, { ...created, has_invoices: false }]);
+              applyProduct(newProductForLineKey, { ...created, has_invoices: false });
+              setNewProductForLineKey(null);
+              return created;
+            }}
+          />
+        </Modal>
+      )}
+
+      {showCancelDialog && (
+        <ConfirmDialog
+          title="Cancel this invoice?"
+          message="Cancelling is terminal — a cancelled invoice can't be edited or issued again."
+          confirmLabel="Cancel Invoice"
+          danger
+          onCancel={() => setShowCancelDialog(false)}
+          onConfirm={async () => {
+            const updated = await cancelInvoice(invoice.id, cancelReason.trim() || null).then(() => getInvoice(invoice.id));
+            setInvoice(updated);
+            setLines(toEditableLines(updated, formatMinor));
+            setShowCancelDialog(false);
+          }}
+        >
+          <label className="block text-sm">
+            Reason (optional)
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+              rows={2}
+            />
+          </label>
+        </ConfirmDialog>
       )}
     </div>
   );

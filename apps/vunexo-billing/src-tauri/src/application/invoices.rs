@@ -1,9 +1,5 @@
-//! Invoice use cases. application-architecture.md §4/§4c.
-//!
-//! Scope of this slice: create/update/delete a draft, issue, cancel,
-//! duplicate, get, list. `EditIssuedInvoice` and payment-driven
-//! `set_status` land alongside the Payments slice — see
-//! `application::ports::invoice_repository`'s note on `set_status`.
+//! Invoice use cases. application-architecture.md §4/§4c. Payment-driven
+//! `set_status` is implemented in `application/payments.rs`.
 
 use std::sync::Arc;
 
@@ -16,8 +12,8 @@ use crate::domain::calculation::{
 use crate::domain::customer::Customer;
 use crate::domain::invoice::{
     BusinessSnapshotFields, CustomerSnapshotFields, DiscountType, DraftInvoiceInput,
-    DraftInvoiceToSave, InvoiceFilter, InvoiceStatus, InvoiceSummary, InvoiceWithLineItems,
-    IssueInvoiceData,
+    DraftInvoiceToSave, EditIssuedInvoiceData, InvoiceFilter, InvoiceStatus, InvoiceSummary,
+    InvoiceWithLineItems, IssueInvoiceData,
 };
 use crate::domain::invoice_line_item::{InvoiceLineItem, LineItemInput, LineItemToSave};
 
@@ -213,6 +209,105 @@ impl InvoiceUseCases {
         };
 
         match self.invoice_repo.issue(&mut *tx, id, data).await {
+            Ok(result) => {
+                tx.commit().await?;
+                Ok(result)
+            }
+            Err(e) => {
+                let _ = tx.rollback().await;
+                Err(e.into())
+            }
+        }
+    }
+
+    /// user-flows.md's "Editing an issued invoice" rule: allowed on
+    /// `Issued`/`PartiallyPaid`/`Paid`, re-snapshots customer/business at
+    /// *this* save (re-reading their current live data — an explicit,
+    /// intentional edit of this invoice, unlike a customer record silently
+    /// changing elsewhere, which must never touch old invoices), recomputes
+    /// totals, never touches `payments` or `status`. If the new total drops
+    /// below what's already been paid, the invoice simply stays whatever
+    /// status it already was — the UI surfaces that as an overpayment, this
+    /// use case never adjusts a payment record to compensate.
+    pub async fn edit_issued_invoice(
+        &self,
+        id: i64,
+        input: DraftInvoiceInput,
+    ) -> Result<InvoiceWithLineItems, ApplicationError> {
+        let existing = self
+            .invoice_repo
+            .get(id)
+            .await?
+            .ok_or(ApplicationError::NotFound {
+                entity: "invoice",
+                id,
+            })?;
+        if !matches!(
+            existing.invoice.status,
+            InvoiceStatus::Issued | InvoiceStatus::PartiallyPaid | InvoiceStatus::Paid
+        ) {
+            return Err(ApplicationError::Validation(
+                "only an issued, partially paid, or paid invoice can be edited this way".into(),
+            ));
+        }
+        let customer_id = input.customer_id.ok_or_else(|| {
+            ApplicationError::Validation("a customer is required on an issued invoice".into())
+        })?;
+        if input.line_items.is_empty() {
+            return Err(ApplicationError::Validation(
+                "at least one line item is required on an issued invoice".into(),
+            ));
+        }
+
+        let customer: Customer = self.customer_repo.find_by_id(customer_id).await?.ok_or(
+            ApplicationError::NotFound {
+                entity: "customer",
+                id: customer_id,
+            },
+        )?;
+        let business: Business = self.business_repo.get().await?.ok_or_else(|| {
+            ApplicationError::Validation(
+                "a business profile must exist before editing invoices".into(),
+            )
+        })?;
+
+        let calc = calculation::calculate_invoice(&to_calc_input(&input));
+        let draft_to_save = assemble_draft_to_save(input, &calc);
+        let data = EditIssuedInvoiceData {
+            customer_id: draft_to_save.customer_id,
+            customer_snapshot: CustomerSnapshotFields {
+                name: Some(customer.name),
+                phone: customer.phone,
+                email: customer.email,
+                address: customer.address,
+                gstin: customer.gstin,
+            },
+            business_snapshot: BusinessSnapshotFields {
+                name: Some(business.name),
+                address: business.address,
+                gstin: business.gstin,
+                phone: business.phone,
+                email: business.email,
+                bank_details: business.bank_details,
+                upi_id: business.upi_id,
+                logo_path: business.logo_path,
+            },
+            is_interstate: draft_to_save.is_interstate,
+            invoice_date: draft_to_save.invoice_date,
+            due_date: draft_to_save.due_date,
+            notes: draft_to_save.notes,
+            terms: draft_to_save.terms,
+            discount_type: draft_to_save.discount_type,
+            discount_value: draft_to_save.discount_value,
+            subtotal_minor: draft_to_save.subtotal_minor,
+            discount_amount_minor: draft_to_save.discount_amount_minor,
+            tax_amount_minor: draft_to_save.tax_amount_minor,
+            total_minor: draft_to_save.total_minor,
+            line_items: draft_to_save.line_items,
+        };
+
+        let mut tx = self.tx_manager.begin().await?;
+        match self.invoice_repo.update_issued(&mut *tx, id, data).await {
             Ok(result) => {
                 tx.commit().await?;
                 Ok(result)
@@ -485,20 +580,24 @@ mod integration_tests {
 
     use crate::application::business::BusinessUseCases;
     use crate::application::customers::CustomerUseCases;
+    use crate::application::payments::PaymentUseCases;
     use crate::application::ports::business_repository::BusinessRepository;
     use crate::application::ports::customer_repository::CustomerRepository;
     use crate::application::ports::invoice_number_sequencer::InvoiceNumberSequencer;
     use crate::application::ports::invoice_repository::InvoiceRepository;
+    use crate::application::ports::payment_repository::PaymentRepository;
     use crate::application::ports::settings_repository::SettingsRepository;
     use crate::application::ports::transaction::TransactionManager;
     use crate::domain::business::Business;
     use crate::domain::customer::CustomerFields;
     use crate::domain::invoice::{DiscountType, DraftInvoiceInput, InvoiceStatus};
     use crate::domain::invoice_line_item::LineItemInput;
+    use crate::domain::payment::{NewPayment, PaymentMethod};
     use crate::infrastructure::database::sqlite_business_repository::SqliteBusinessRepository;
     use crate::infrastructure::database::sqlite_customer_repository::SqliteCustomerRepository;
     use crate::infrastructure::database::sqlite_invoice_number_sequencer::SqliteInvoiceNumberSequencer;
     use crate::infrastructure::database::sqlite_invoice_repository::SqliteInvoiceRepository;
+    use crate::infrastructure::database::sqlite_payment_repository::SqlitePaymentRepository;
     use crate::infrastructure::database::sqlite_settings_repository::SqliteSettingsRepository;
     use crate::infrastructure::database::transaction::SqlxTransactionManager;
     use crate::infrastructure::database::{init_pool, run_migrations, seed_defaults};
@@ -507,6 +606,7 @@ mod integration_tests {
 
     struct TestApp {
         invoices: InvoiceUseCases,
+        payments: PaymentUseCases,
         customers: CustomerUseCases,
         business: BusinessUseCases,
         db_path: std::path::PathBuf,
@@ -545,10 +645,13 @@ mod integration_tests {
             Arc::new(SqliteSettingsRepository::new(pool.clone()));
         let invoice_repo: Arc<dyn InvoiceRepository> =
             Arc::new(SqliteInvoiceRepository::new(pool.clone()));
+        let payment_repo: Arc<dyn PaymentRepository> =
+            Arc::new(SqlitePaymentRepository::new(pool.clone()));
         let sequencer: Arc<dyn InvoiceNumberSequencer> =
             Arc::new(SqliteInvoiceNumberSequencer::new(pool));
 
         TestApp {
+            payments: PaymentUseCases::new(payment_repo, invoice_repo.clone(), tx_manager.clone()),
             invoices: InvoiceUseCases::new(
                 invoice_repo,
                 customer_repo.clone(),
@@ -871,5 +974,299 @@ mod integration_tests {
                 .collect::<Vec<_>>(),
             vec![334, 333, 333]
         );
+    }
+
+    /// The inverse of `full_create_and_issue_flow_produces_correct_snapshot_and_totals`'s
+    /// snapshot-immutability assertion: a bare `UpdateCustomer` must never
+    /// leak into an old invoice, but `EditIssuedInvoice` — an explicit,
+    /// intentional edit of *this* invoice — is specifically supposed to
+    /// re-snapshot from whatever the customer/business look like right now
+    /// (user-flows.md's "Editing an issued invoice" rule).
+    #[tokio::test]
+    async fn edit_issued_invoice_resnapshots_current_customer_and_business_data() {
+        let app = setup().await;
+        app.business
+            .create_business(Business {
+                name: "Vunexo Test Co".into(),
+                logo_path: None,
+                address: Some("Old Business Address".into()),
+                phone: None,
+                email: None,
+                gstin: None,
+                bank_details: None,
+                upi_id: None,
+            })
+            .await
+            .unwrap();
+        let customer = app
+            .customers
+            .create_customer(CustomerFields {
+                name: "Acme Traders".into(),
+                phone: None,
+                email: None,
+                address: Some("Old Customer Address".into()),
+                gstin: None,
+            })
+            .await
+            .unwrap();
+        let draft = app
+            .invoices
+            .create_draft_invoice(DraftInvoiceInput {
+                customer_id: Some(customer.id),
+                invoice_date: chrono::NaiveDate::from_ymd_opt(2026, 8, 28).unwrap(),
+                due_date: None,
+                notes: None,
+                terms: None,
+                is_interstate: false,
+                discount_type: None,
+                discount_value: None,
+                line_items: vec![sample_line(1000, 100_000, 0)],
+            })
+            .await
+            .unwrap();
+        let issued = app
+            .invoices
+            .issue_invoice(draft.invoice.id, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            issued.invoice.customer_snapshot_address.as_deref(),
+            Some("Old Customer Address")
+        );
+
+        // Both live records change *after* issue.
+        app.customers
+            .update_customer(
+                customer.id,
+                CustomerFields {
+                    name: "Acme Traders".into(),
+                    phone: None,
+                    email: None,
+                    address: Some("New Customer Address".into()),
+                    gstin: None,
+                },
+            )
+            .await
+            .unwrap();
+        app.business
+            .update_business(Business {
+                name: "Vunexo Test Co".into(),
+                logo_path: None,
+                address: Some("New Business Address".into()),
+                phone: None,
+                email: None,
+                gstin: None,
+                bank_details: None,
+                upi_id: None,
+            })
+            .await
+            .unwrap();
+
+        let edited = app
+            .invoices
+            .edit_issued_invoice(
+                issued.invoice.id,
+                DraftInvoiceInput {
+                    customer_id: Some(customer.id),
+                    invoice_date: issued.invoice.invoice_date,
+                    due_date: None,
+                    notes: Some("fixed a typo".into()),
+                    terms: None,
+                    is_interstate: false,
+                    discount_type: None,
+                    discount_value: None,
+                    line_items: vec![sample_line(2000, 100_000, 0)],
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            edited.invoice.customer_snapshot_address.as_deref(),
+            Some("New Customer Address"),
+            "an explicit edit must re-snapshot from the customer's current data"
+        );
+        assert_eq!(
+            edited.invoice.business_snapshot_address.as_deref(),
+            Some("New Business Address")
+        );
+        assert_eq!(
+            edited.invoice.total_minor, 200_000,
+            "recalculated for the new quantity"
+        );
+        assert_eq!(edited.invoice.notes.as_deref(), Some("fixed a typo"));
+        // Never touched by an edit.
+        assert_eq!(edited.invoice.invoice_number, issued.invoice.invoice_number);
+        assert_eq!(edited.invoice.status, InvoiceStatus::Issued);
+    }
+
+    #[tokio::test]
+    async fn edit_issued_invoice_leaves_status_and_payments_untouched_even_on_overpayment() {
+        let app = setup().await;
+        app.business
+            .create_business(Business {
+                name: "Vunexo Test Co".into(),
+                logo_path: None,
+                address: None,
+                phone: None,
+                email: None,
+                gstin: None,
+                bank_details: None,
+                upi_id: None,
+            })
+            .await
+            .unwrap();
+        let customer = app
+            .customers
+            .create_customer(CustomerFields {
+                name: "Acme Traders".into(),
+                phone: None,
+                email: None,
+                address: None,
+                gstin: None,
+            })
+            .await
+            .unwrap();
+        let draft = app
+            .invoices
+            .create_draft_invoice(DraftInvoiceInput {
+                customer_id: Some(customer.id),
+                invoice_date: chrono::NaiveDate::from_ymd_opt(2026, 8, 28).unwrap(),
+                due_date: None,
+                notes: None,
+                terms: None,
+                is_interstate: false,
+                discount_type: None,
+                discount_value: None,
+                line_items: vec![sample_line(1000, 200_000, 0)],
+            })
+            .await
+            .unwrap();
+        let issued = app
+            .invoices
+            .issue_invoice(draft.invoice.id, None)
+            .await
+            .unwrap();
+        assert_eq!(issued.invoice.total_minor, 200_000);
+
+        app.payments
+            .record_payment(NewPayment {
+                invoice_id: issued.invoice.id,
+                amount_minor: 200_000,
+                method: PaymentMethod::Cash,
+                paid_on: issued.invoice.invoice_date,
+                reference: None,
+            })
+            .await
+            .unwrap();
+        let paid = app.invoices.get_invoice(issued.invoice.id).await.unwrap();
+        assert_eq!(paid.invoice.status, InvoiceStatus::Paid);
+
+        // Editing the invoice down to ₹1,000 must not touch the ₹2,000 payment
+        // or flip status back — it stays PAID, now visibly overpaid.
+        let edited = app
+            .invoices
+            .edit_issued_invoice(
+                issued.invoice.id,
+                DraftInvoiceInput {
+                    customer_id: Some(customer.id),
+                    invoice_date: issued.invoice.invoice_date,
+                    due_date: None,
+                    notes: None,
+                    terms: None,
+                    is_interstate: false,
+                    discount_type: None,
+                    discount_value: None,
+                    line_items: vec![sample_line(1000, 100_000, 0)],
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(edited.invoice.total_minor, 100_000);
+        assert_eq!(
+            edited.invoice.status,
+            InvoiceStatus::Paid,
+            "editing an issued invoice must never touch status — only payments do"
+        );
+        let payments = app
+            .payments
+            .list_payments_for_invoice(issued.invoice.id)
+            .await
+            .unwrap();
+        assert_eq!(payments.len(), 1);
+        assert_eq!(
+            payments[0].amount_minor, 200_000,
+            "the payment record itself is untouched"
+        );
+    }
+
+    #[tokio::test]
+    async fn edit_issued_invoice_rejects_draft_and_cancelled_invoices() {
+        let app = setup().await;
+        app.business
+            .create_business(Business {
+                name: "Vunexo Test Co".into(),
+                logo_path: None,
+                address: None,
+                phone: None,
+                email: None,
+                gstin: None,
+                bank_details: None,
+                upi_id: None,
+            })
+            .await
+            .unwrap();
+        let customer = app
+            .customers
+            .create_customer(CustomerFields {
+                name: "Acme Traders".into(),
+                phone: None,
+                email: None,
+                address: None,
+                gstin: None,
+            })
+            .await
+            .unwrap();
+        let input = DraftInvoiceInput {
+            customer_id: Some(customer.id),
+            invoice_date: chrono::NaiveDate::from_ymd_opt(2026, 8, 28).unwrap(),
+            due_date: None,
+            notes: None,
+            terms: None,
+            is_interstate: false,
+            discount_type: None,
+            discount_value: None,
+            line_items: vec![sample_line(1000, 100_000, 0)],
+        };
+
+        let draft = app
+            .invoices
+            .create_draft_invoice(input.clone())
+            .await
+            .unwrap();
+        let draft_result = app
+            .invoices
+            .edit_issued_invoice(draft.invoice.id, input.clone())
+            .await;
+        assert!(matches!(draft_result, Err(ApplicationError::Validation(_))));
+
+        let issued = app
+            .invoices
+            .issue_invoice(draft.invoice.id, None)
+            .await
+            .unwrap();
+        app.invoices
+            .cancel_invoice(issued.invoice.id, None)
+            .await
+            .unwrap();
+        let cancelled_result = app
+            .invoices
+            .edit_issued_invoice(issued.invoice.id, input)
+            .await;
+        assert!(matches!(
+            cancelled_result,
+            Err(ApplicationError::Validation(_))
+        ));
     }
 }

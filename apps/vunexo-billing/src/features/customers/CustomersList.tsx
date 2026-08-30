@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { useCustomers } from "../../hooks/useCustomers";
 import type { Customer, CustomerListItem } from "../../lib/tauri/types";
@@ -15,6 +16,7 @@ export function CustomersList() {
   const { customers, error, create, update, archive, restore, remove } = useCustomers(includeArchived);
   const [editing, setEditing] = useState<Customer | "new" | null>(null);
   const [rowError, setRowError] = useState<unknown>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
 
   const runRowAction = async (action: () => Promise<void>) => {
     setRowError(null);
@@ -92,7 +94,7 @@ export function CustomersList() {
                     </button>
                   )}
                   {!c.has_invoices && (
-                    <button onClick={() => runRowAction(() => remove(c.id))} className="text-red-400 hover:underline">
+                    <button onClick={() => setDeleteTarget(c)} className="text-red-400 hover:underline">
                       Delete
                     </button>
                   )}
@@ -105,6 +107,20 @@ export function CustomersList() {
 
       {customers !== null && customers.length === 0 && (
         <p className="text-sm text-slate-500">No customers yet — click "+ New Customer" to add one.</p>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete this customer?"
+          message={`"${deleteTarget.name}" has no invoice history, so this permanently removes the record. This can't be undone.`}
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={async () => {
+            await runRowAction(() => remove(deleteTarget.id));
+            setDeleteTarget(null);
+          }}
+        />
       )}
     </div>
   );

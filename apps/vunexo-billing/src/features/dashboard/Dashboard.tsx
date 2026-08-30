@@ -1,0 +1,94 @@
+import { ErrorBanner } from "../../components/ErrorBanner";
+import { StatusBadge } from "../../components/StatusBadge";
+import { useCurrency } from "../../hooks/useCurrency";
+import { useDashboard } from "../../hooks/useDashboard";
+
+/**
+ * ui-ux.md §1/§8 — the default landing screen: today/month/outstanding/
+ * paid/overdue metrics plus a recent-invoices list. Every recent-invoice
+ * row is clickable through to the invoice detail per user-flows.md §8.
+ *
+ * Scope trim: the metric cards themselves aren't yet clickable through to a
+ * filtered Invoices List — `InvoiceFilter` only supports a single stored
+ * `status`, not the derived `OVERDUE` pseudo-status user-flows.md/ui-ux.md
+ * describe, and the Invoices List keeps its filter state locally rather
+ * than lifted into `App`. Wiring that up is real, separate work, not done
+ * here to avoid a half-built filter concept; the recent-invoices
+ * click-through below is fully implemented.
+ */
+export function Dashboard({ onOpenInvoice }: { onOpenInvoice: (id: number) => void }) {
+  const { symbol, formatMinor } = useCurrency();
+  const { metrics, error } = useDashboard();
+
+  if (!metrics) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-semibold">Dashboard</h1>
+        <ErrorBanner error={error} />
+        {!error && <p className="text-slate-500">Loading…</p>}
+      </div>
+    );
+  }
+
+  const cards = [
+    { label: "Today's sales", value: metrics.today_sales_minor },
+    { label: "This month's sales", value: metrics.month_sales_minor },
+    { label: "Outstanding", value: metrics.outstanding_total_minor },
+    { label: "Paid this month", value: metrics.paid_total_minor },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-xl font-semibold">Dashboard</h1>
+      <ErrorBanner error={error} />
+
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {cards.map((c) => (
+          <div key={c.label} className="rounded border border-slate-700 bg-slate-900 p-4">
+            <p className="text-xs text-slate-400">{c.label}</p>
+            <p className="mt-1 text-lg font-semibold">{symbol}{formatMinor(c.value)}</p>
+          </div>
+        ))}
+        <div className="rounded border border-slate-700 bg-slate-900 p-4">
+          <p className="text-xs text-slate-400">Overdue</p>
+          <p className="mt-1 text-lg font-semibold text-red-400">
+            {metrics.overdue.count} · {symbol}{formatMinor(metrics.overdue.total_minor)}
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-slate-300">Recent invoices</h2>
+        <table className="w-full text-left text-sm">
+          <thead className="text-slate-400">
+            <tr>
+              <th className="pb-2">Number</th>
+              <th className="pb-2">Customer</th>
+              <th className="pb-2">Date</th>
+              <th className="pb-2">Total</th>
+              <th className="pb-2">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {metrics.recent_invoices.map((inv) => (
+              <tr key={inv.id} className="border-t border-slate-800">
+                <td className="py-2">
+                  <button onClick={() => onOpenInvoice(inv.id)} className="text-sky-400 hover:underline">
+                    {inv.invoice_number ?? `Draft #${inv.id}`}
+                  </button>
+                </td>
+                <td className="py-2 text-slate-400">{inv.customer_name ?? "—"}</td>
+                <td className="py-2 text-slate-400">{inv.invoice_date}</td>
+                <td className="py-2 text-slate-400">{symbol}{formatMinor(inv.total_minor)}</td>
+                <td className="py-2">
+                  <StatusBadge status={inv.status} isOverdue={inv.is_overdue} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {metrics.recent_invoices.length === 0 && <p className="text-sm text-slate-500">No invoices yet.</p>}
+      </div>
+    </div>
+  );
+}

@@ -7,16 +7,22 @@ import type {
   CustomerFields,
   CustomerFilter,
   CustomerListItem,
+  DashboardMetrics,
   DraftInvoiceInput,
   InvoiceFilter,
   InvoiceSummary,
   InvoiceWithLineItems,
+  NewPayment,
+  Payment,
+  PaymentFields,
   Product,
   ProductFields,
   ProductFilter,
   ProductListItem,
   Settings,
   SettingsFields,
+  TaxRate,
+  TaxRateFields,
 } from "./types";
 
 /** Round 1 technical spike: proves the React -> Tauri -> Rust round trip. */
@@ -116,6 +122,10 @@ export function issueInvoice(id: number, customNumber: string | null): Promise<I
   return callCommand<InvoiceWithLineItems>("issue_invoice", { id, customNumber });
 }
 
+export function editIssuedInvoice(id: number, input: DraftInvoiceInput): Promise<InvoiceWithLineItems> {
+  return callCommand<InvoiceWithLineItems>("edit_issued_invoice", { id, input });
+}
+
 export function cancelInvoice(id: number, reason: string | null): Promise<void> {
   return callCommand<void>("cancel_invoice", { id, reason });
 }
@@ -134,4 +144,36 @@ export function getInvoice(id: number): Promise<InvoiceWithLineItems> {
 
 export function listInvoices(filter: InvoiceFilter): Promise<InvoiceSummary[]> {
   return callCommand<InvoiceSummary[]>("list_invoices", { filter });
+}
+
+export function recordPayment(payment: NewPayment): Promise<Payment> {
+  return callCommand<Payment>("record_payment", { payment });
+}
+
+export function updatePayment(id: number, fields: PaymentFields): Promise<Payment> {
+  return callCommand<Payment>("update_payment", { id, fields });
+}
+
+export function deletePayment(id: number): Promise<void> {
+  return callCommand<void>("delete_payment", { id });
+}
+
+export function listPaymentsForInvoice(invoiceId: number): Promise<Payment[]> {
+  return callCommand<Payment[]>("list_payments_for_invoice", { invoiceId });
+}
+
+export function createTaxRate(fields: TaxRateFields): Promise<TaxRate> {
+  return callCommand<TaxRate>("create_tax_rate", { fields });
+}
+
+export function updateTaxRate(id: number, fields: TaxRateFields): Promise<TaxRate> {
+  return callCommand<TaxRate>("update_tax_rate", { id, fields });
+}
+
+export function listTaxRates(): Promise<TaxRate[]> {
+  return callCommand<TaxRate[]>("list_tax_rates");
+}
+
+export function getDashboardMetrics(): Promise<DashboardMetrics> {
+  return callCommand<DashboardMetrics>("get_dashboard_metrics");
 }
