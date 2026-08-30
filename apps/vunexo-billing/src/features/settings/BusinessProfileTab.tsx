@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { chooseOpenPath } from "../../lib/tauri/client";
 import { useBusiness } from "../../hooks/useBusiness";
 import type { Business } from "../../lib/tauri/types";
 
@@ -76,6 +77,47 @@ function BusinessProfileForm({
           Email
           <input value={fields.email ?? ""} onChange={set("email")} className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2" />
         </label>
+      </div>
+
+      {/* The logo is a *path*, not an upload — the app is offline-first and
+          the file stays where the user keeps it. The invoice PDF prints it in
+          the letterhead, and silently omits it if the file has since moved. */}
+      <div className="block text-sm">
+        Logo
+        <div className="mt-1 flex items-center gap-2">
+          <input
+            readOnly
+            value={fields.logo_path ?? ""}
+            placeholder="No logo chosen"
+            className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-400"
+          />
+          <button
+            type="button"
+            onClick={async () => {
+              const path = await chooseOpenPath({
+                filters: [{ name: "Image", extensions: ["png", "jpg", "jpeg"] }],
+              });
+              if (!path) return;
+              setSaved(false);
+              setFields((f) => ({ ...f, logo_path: path }));
+            }}
+            className="shrink-0 rounded border border-slate-700 px-3 py-2"
+          >
+            Choose…
+          </button>
+          {fields.logo_path && (
+            <button
+              type="button"
+              onClick={() => {
+                setSaved(false);
+                setFields((f) => ({ ...f, logo_path: null }));
+              }}
+              className="shrink-0 rounded border border-slate-700 px-3 py-2 text-slate-400"
+            >
+              Remove
+            </button>
+          )}
+        </div>
       </div>
 
       <label className="block text-sm">

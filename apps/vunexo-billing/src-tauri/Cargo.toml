@@ -3,7 +3,7 @@ name = "vunexo-billing"
 version = "0.0.0"
 description = "Vunexo Billing — free, offline-first invoicing for small businesses"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.88"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -17,6 +17,14 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 anyhow = "1"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.22"
+# `default-features = false` deliberately drops printpdf's `html` feature and the
+# whole azul layout/fontconfig stack with it: this app composes the invoice
+# itself (ADR — Round 7, "real layout control, not print the webview"), so the
+# only things wanted here are the core PDF operator API, font embedding, and
+# PNG/JPEG decoding for the business logo.
+printpdf = { version = "0.12", default-features = false, features = ["images", "png", "jpeg", "text_layout"] }
+tauri-plugin-dialog = "2"
 
 [dev-dependencies]
 proptest = "1"

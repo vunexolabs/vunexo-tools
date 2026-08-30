@@ -5,8 +5,10 @@
 pub mod business_repository;
 pub mod customer_repository;
 pub mod dashboard_repository;
+pub mod file_writer;
 pub mod infrastructure_error;
 pub mod invoice_number_sequencer;
+pub mod invoice_pdf_renderer;
 pub mod invoice_repository;
 pub mod payment_repository;
 pub mod product_repository;

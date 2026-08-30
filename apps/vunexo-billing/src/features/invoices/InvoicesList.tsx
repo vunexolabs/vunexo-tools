@@ -3,9 +3,11 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { StatusBadge } from "../../components/StatusBadge";
 import { PaymentPanel } from "../payments/PaymentPanel";
+import { InvoicePdfPreview } from "./InvoicePdfPreview";
 import { createDraftInvoice } from "../../lib/tauri/commands";
 import { useCurrency } from "../../hooks/useCurrency";
 import { useInvoices } from "../../hooks/useInvoices";
+import { useInvoicePdf } from "../../hooks/useInvoicePdf";
 import type { InvoiceStatus } from "../../lib/tauri/types";
 
 type FilterOption = InvoiceStatus | "OVERDUE" | null;
@@ -39,6 +41,10 @@ export function InvoicesList({ onOpen }: { onOpen: (id: number) => void }) {
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  // user-flows.md §7: the PDF action is available on an existing invoice from
+  // the list, not only from inside the editor.
+  const [pdfInvoice, setPdfInvoice] = useState<{ id: number; number: string | null } | null>(null);
+  const pdf = useInvoicePdf();
 
   const runRowAction = async (action: () => Promise<void>) => {
     setRowError(null);
@@ -154,6 +160,18 @@ export function InvoicesList({ onOpen }: { onOpen: (id: number) => void }) {
                     )}
                     {inv.status !== "DRAFT" && (
                       <button
+                        onClick={() => {
+                          setPdfInvoice({ id: inv.id, number: inv.invoice_number });
+                          void pdf.preview(inv.id);
+                        }}
+                        disabled={pdf.busy}
+                        className="text-sky-400 hover:underline disabled:opacity-50"
+                      >
+                        PDF
+                      </button>
+                    )}
+                    {inv.status !== "DRAFT" && (
+                      <button
                         onClick={() => runRowAction(async () => { const d = await duplicate(inv.id); onOpen(d.id); })}
                         className="text-sky-400 hover:underline"
                       >
@@ -179,6 +197,23 @@ export function InvoicesList({ onOpen }: { onOpen: (id: number) => void }) {
           ))}
         </tbody>
       </table>
+
+      <ErrorBanner error={pdf.error} />
+
+      {pdf.previewUrl && pdfInvoice && (
+        <InvoicePdfPreview
+          url={pdf.previewUrl}
+          title={pdf.previewTitle}
+          saving={pdf.busy}
+          onClose={() => {
+            pdf.closePreview();
+            setPdfInvoice(null);
+          }}
+          onSave={() =>
+            void pdf.saveAs(pdfInvoice.id, pdf.suggestedFileName(pdfInvoice.number, pdfInvoice.id))
+          }
+        />
+      )}
 
       {invoices !== null && invoices.length === 0 && (
         <p className="text-sm text-slate-500">No invoices yet — click "+ New Invoice" to create one.</p>

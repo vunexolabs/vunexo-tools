@@ -8,6 +8,7 @@ pub mod dashboard;
 pub mod error;
 pub mod invoices;
 pub mod payments;
+pub mod pdf;
 pub mod ports;
 pub mod products;
 pub mod settings;

@@ -19,6 +19,7 @@ import type {
   ProductFields,
   ProductFilter,
   ProductListItem,
+  RenderedInvoicePdf,
   Settings,
   SettingsFields,
   TaxRate,
@@ -176,4 +177,20 @@ export function listTaxRates(): Promise<TaxRate[]> {
 
 export function getDashboardMetrics(): Promise<DashboardMetrics> {
   return callCommand<DashboardMetrics>("get_dashboard_metrics");
+}
+
+/**
+ * Renders an invoice at any status — Preview is reachable from a draft
+ * (user-flows.md §5 step 5), so this is not issued-only. The bytes come back
+ * base64-encoded because Tauri would otherwise serialize them as a JSON array
+ * of numbers; `invoicePdfBlob` turns them back into something the preview
+ * pane can display.
+ */
+export function renderInvoicePdf(id: number): Promise<RenderedInvoicePdf> {
+  return callCommand<RenderedInvoicePdf>("render_invoice_pdf", { id });
+}
+
+/** Writes the invoice PDF to a path already chosen in the OS save dialog. */
+export function saveInvoicePdf(id: number, path: string): Promise<void> {
+  return callCommand<void>("save_invoice_pdf", { id, path });
 }

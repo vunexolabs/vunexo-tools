@@ -2,6 +2,7 @@
 //! `crate::application`, serialize output. No business logic here.
 //! See docs/vunexo-billing/architecture.md and application-architecture.md §5.
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use tauri::State;
 
 use crate::application::business::BusinessUseCases;
@@ -9,6 +10,7 @@ use crate::application::customers::CustomerUseCases;
 use crate::application::dashboard::DashboardUseCases;
 use crate::application::invoices::InvoiceUseCases;
 use crate::application::payments::PaymentUseCases;
+use crate::application::pdf::PdfUseCases;
 use crate::application::products::ProductUseCases;
 use crate::application::settings::SettingsUseCases;
 use crate::application::tax_rates::TaxRateUseCases;
@@ -329,4 +331,40 @@ pub async fn get_dashboard_metrics(
     dashboard_use_cases: State<'_, DashboardUseCases>,
 ) -> Result<DashboardMetrics, ApplicationError> {
     dashboard_use_cases.get_dashboard_metrics().await
+}
+
+/// A rendered invoice on its way to the webview. The bytes are base64 rather
+/// than a `Vec<u8>`, because Tauri serializes a byte vector as a JSON array
+/// of numbers — several times the size, for a payload that is already tens of
+/// kilobytes. The frontend turns this straight back into a Blob for the
+/// preview pane.
+#[derive(serde::Serialize)]
+pub struct RenderedInvoicePdfPayload {
+    pub file_name: String,
+    pub bytes_base64: String,
+}
+
+#[tauri::command]
+pub async fn render_invoice_pdf(
+    pdf_use_cases: State<'_, PdfUseCases>,
+    id: i64,
+) -> Result<RenderedInvoicePdfPayload, ApplicationError> {
+    let rendered = pdf_use_cases.render_invoice_pdf(id).await?;
+    Ok(RenderedInvoicePdfPayload {
+        file_name: rendered.file_name,
+        bytes_base64: BASE64_STANDARD.encode(&rendered.bytes),
+    })
+}
+
+/// `path` is whatever the OS save dialog returned to the frontend; the PDF
+/// itself is re-rendered here rather than sent down and back up again.
+#[tauri::command]
+pub async fn save_invoice_pdf(
+    pdf_use_cases: State<'_, PdfUseCases>,
+    id: i64,
+    path: String,
+) -> Result<(), ApplicationError> {
+    pdf_use_cases
+        .save_invoice_pdf(id, std::path::Path::new(&path))
+        .await
 }

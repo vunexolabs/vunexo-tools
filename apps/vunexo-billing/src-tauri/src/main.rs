@@ -14,10 +14,13 @@ use application::customers::CustomerUseCases;
 use application::dashboard::DashboardUseCases;
 use application::invoices::InvoiceUseCases;
 use application::payments::PaymentUseCases;
+use application::pdf::PdfUseCases;
 use application::ports::business_repository::BusinessRepository;
 use application::ports::customer_repository::CustomerRepository;
 use application::ports::dashboard_repository::DashboardRepository;
+use application::ports::file_writer::FileWriter;
 use application::ports::invoice_number_sequencer::InvoiceNumberSequencer;
+use application::ports::invoice_pdf_renderer::InvoicePdfRenderer;
 use application::ports::invoice_repository::InvoiceRepository;
 use application::ports::payment_repository::PaymentRepository;
 use application::ports::product_repository::ProductRepository;
@@ -37,9 +40,12 @@ use infrastructure::database::sqlite_product_repository::SqliteProductRepository
 use infrastructure::database::sqlite_settings_repository::SqliteSettingsRepository;
 use infrastructure::database::sqlite_tax_rate_repository::SqliteTaxRateRepository;
 use infrastructure::database::transaction::SqlxTransactionManager;
+use infrastructure::filesystem::file_writer::StdFileWriter;
+use infrastructure::pdf::PrintpdfInvoiceRenderer;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
@@ -72,6 +78,9 @@ fn main() {
                 Arc::new(SqliteDashboardRepository::new(pool.clone()));
             let sequencer: Arc<dyn InvoiceNumberSequencer> =
                 Arc::new(SqliteInvoiceNumberSequencer::new(pool));
+            let pdf_renderer: Arc<dyn InvoicePdfRenderer> =
+                Arc::new(PrintpdfInvoiceRenderer::new());
+            let file_writer: Arc<dyn FileWriter> = Arc::new(StdFileWriter::new());
 
             app.manage(BusinessUseCases::new(
                 business_repo.clone(),
@@ -88,9 +97,18 @@ fn main() {
                 tx_manager.clone(),
             ));
             app.manage(PaymentUseCases::new(
-                payment_repo,
+                payment_repo.clone(),
                 invoice_repo.clone(),
                 tx_manager.clone(),
+            ));
+            app.manage(PdfUseCases::new(
+                invoice_repo.clone(),
+                customer_repo.clone(),
+                business_repo.clone(),
+                settings_repo.clone(),
+                payment_repo,
+                pdf_renderer,
+                file_writer,
             ));
             app.manage(TaxRateUseCases::new(tax_rate_repo, tx_manager.clone()));
             app.manage(DashboardUseCases::new(dashboard_repo));
@@ -144,6 +162,8 @@ fn main() {
             commands::update_tax_rate,
             commands::list_tax_rates,
             commands::get_dashboard_metrics,
+            commands::render_invoice_pdf,
+            commands::save_invoice_pdf,
         ])
         .run(tauri::generate_context!())
         .expect("error while running vunexo-billing");

@@ -17,7 +17,7 @@ Last updated: 2026-08-30.
 
 Round 7 (implementation) in progress. Backend: Rust/Tauri/SQLx, `apps/vunexo-billing/src-tauri/`. Frontend: React/TS/Tailwind, `apps/vunexo-billing/src/`.
 
-**⚠️ Uncommitted work-in-progress.** Last commit is `3e480f4` ("Round 7: Invoices vertical slice", 2026-08-29). Everything from 2026-08-30 onward (Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX-audit fixes, currency/country support) exists only in the working tree. Run `git status` before assuming otherwise.
+**⚠️ Uncommitted work-in-progress.** Last commit is `6209e06` ("Round 7: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, currency support"). The PDF-generation slice below exists only in the working tree. Run `git status` before assuming otherwise.
 
 | Slice | Backend | Frontend | Tests |
 |---|---|---|---|
@@ -28,31 +28,37 @@ Round 7 (implementation) in progress. Backend: Rust/Tauri/SQLx, `apps/vunexo-bil
 | Settings screen | ✅ | ✅ 3 tabs: Business Profile / Tax Rates / Invoicing | n/a |
 | Tax Rates CRUD | ✅ create/update/list (no delete, per spec) | ✅ inline-edit table; wired into Product form + invoice line items | 3 integration tests |
 | EditIssuedInvoice | ✅ `update_issued`, re-snapshots fresh at every save | ✅ Issued/PartiallyPaid/Paid fully editable, Save Changes/Duplicate/Cancel in editor | 3 integration tests |
-| GST split (CGST/SGST vs IGST) | `split_gst` exists, not yet called server-side | ✅ mirrored in `lib/tauri/types.ts::splitGst`, shown in editor totals | see gaps |
+| GST split (CGST/SGST vs IGST) | ✅ called server-side by `domain::invoice_pdf` | ✅ mirrored in `lib/tauri/types.ts::splitGst`, shown in editor totals | covered by PDF tests |
+| **PDF generation** | ✅ `printpdf` template, `InvoicePdfRenderer` port, `FileWriter` port | ✅ preview modal (real PDF in an iframe), Preview / Issue & PDF / Print–Save PDF, list row action, logo file picker | 35 tests |
 | UX audit fixes | — | ✅ `ConfirmDialog`, `SearchablePicker` + quick-add modals, live-updating totals, "Overdue" filter | — |
 | Currency/country | — (pure display config) | ✅ `lib/currency.ts` (60 countries), `hooks/useCurrency.tsx` (app-wide context), every screen money-format-aware | — |
 
-Backend: 38 integration tests passing, `cargo fmt`/`clippy` clean (4 pre-existing harmless warnings — see below). Frontend: `pnpm typecheck`/`lint`/`build` all clean.
+Backend: 73 tests passing, `cargo fmt`/`clippy` clean (1 harmless warning — see below). Frontend: `pnpm typecheck`/`lint`/`build` all clean.
 
 ### Pre-existing harmless warnings (don't "fix" without a reason)
 
-- `ApplicationError::Infrastructure` field never read, `InfrastructureError::Io` never constructed — intentional, kept for API completeness.
-- `domain::calculation::GstSplit`/`split_gst` — dead code *for now*, stops being dead once PDF generation calls it server-side.
+- `ApplicationError::Infrastructure` field never read — intentional, kept for API completeness. This is now the *only* backend warning: `InfrastructureError::Io` (constructed by `StdFileWriter`) and `GstSplit`/`split_gst` (called by `domain::invoice_pdf`) both stopped being dead code when PDF generation landed.
 - `hooks/useCurrency.tsx` triggers one ESLint `react-refresh/only-export-components` warning (exports both a component and a hook) — cosmetic, common context+hook pattern.
+
+### Things that will bite you if you don't know them
+
+- **`printpdf` must keep its `text_layout` feature.** Font subsetting only exists on that feature (`prepare_fonts_for_serialization` has a `#[cfg(not(...))]` arm that embeds the full face). Removing it to slim the dependency tree turns a 32 KB invoice into a 743 KB one. The feature also changes `ParsedFont`'s API — see `infrastructure/pdf/fonts.rs`.
+- **`domain/currency.rs` and `src/lib/currency.ts` are two copies of the same table.** Add a currency to both, or the screen and the PDF disagree.
+- The embedded DejaVu Sans has no glyph for BDT's `৳` or SAR's `﷼`; those fall back to the ISO code by design (`Fonts::can_render`). Don't "fix" it without swapping the font.
 
 ## Known gaps (deliberate, not oversights)
 
 - **Only India's GST tax model is implemented.** Currency display is dynamic per-country now, but tax regime logic is India-specific and locked as V1 scope. **User confirmed (2026-08-30): fine for now — multi-country tax support is an explicit future-version item. Don't build it speculatively, but don't design anything that'd make it harder later either.**
 - Line-level discounts: engine supports them, editor UI only exposes invoice-level discount.
 - Dashboard metric cards aren't clickable-through to a filtered Invoices List (recent-invoices rows are). Needs `InvoiceFilter` to support a derived `OVERDUE` pseudo-status plus lifting filter state out of `InvoicesList`.
-- PDF generation — not started (`infrastructure/pdf/` still the Round 1 stub).
-- Backup/restore/export — not started (`infrastructure/filesystem/` still the Round 1 stub).
+- The PDF prints one neutral `Tax` line outside India rather than a CGST/SGST/IGST split — same India-only constraint as above, and the Invoice Editor's on-screen totals now match it.
+- Backup/restore/export — not started. `infrastructure/filesystem/` now has a real `FileWriter` (used by Save PDF) to build the `.vbx` work on.
 
-## Next up (agreed order, 2026-08-30)
+## Next up (agreed order)
 
-1. **PDF generation** — dedicated Rust PDF crate composing the invoice directly (user wants real layout control, not "print the webview"). Also where `split_gst` gets its first real caller, and where `business.logo_path` likely needs an actual file picker (not yet exposed in `BusinessProfileTab`).
-2. Backup/restore + export — `.vbx` format already spec'd in `database-schema.md` §9 / `user-flows.md` §9, implement against that.
-3. Another audit pass after PDF/backup land, same method as 2026-08-30's.
+1. ~~PDF generation~~ — done 2026-08-30 (session 2). See the daily file for the library choice, the layering, and the font trade-off.
+2. Backup/restore + export — `.vbx` format already spec'd in `database-schema.md` §9 / `user-flows.md` §9, implement against that. Reuse the `FileWriter` port.
+3. Another audit pass after backup lands, same method as 2026-08-30's — the PDF template itself has only been checked against generated samples, not against a real business's data.
 
 ## Verification commands (all of these, every slice)
 
@@ -70,4 +76,4 @@ The user's `pnpm tauri dev` session tends to stay running for an entire work ses
 
 - `2026-08-28.md` — Rounds 1–6 locked; Business/Customers/Products CRUD + calculation engine implemented.
 - `2026-08-29.md` — Invoices vertical slice (draft/issue/cancel/duplicate/list).
-- `2026-08-30.md` — Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support. This progress-tracking system itself was created today.
+- `2026-08-30.md` — two sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end.

@@ -187,6 +187,24 @@ export interface TaxRateFields {
 
 export type InvoiceStatus = "DRAFT" | "ISSUED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
 
+/** What `render_invoice_pdf` returns — see the command's own note on the base64. */
+export interface RenderedInvoicePdf {
+  file_name: string;
+  bytes_base64: string;
+}
+
+/**
+ * Turns a rendered invoice into an object URL the preview pane can point an
+ * `<iframe>` at. The caller owns the URL and must `URL.revokeObjectURL` it,
+ * or every preview leaks a copy of the document.
+ */
+export function invoicePdfObjectUrl(rendered: RenderedInvoicePdf): string {
+  const binary = atob(rendered.bytes_base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+}
+
 export interface InvoiceLineItem {
   id: number;
   product_id: number | null;

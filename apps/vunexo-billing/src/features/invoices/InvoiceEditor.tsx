@@ -7,6 +7,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { CustomerForm } from "../customers/CustomerForm";
 import { PaymentPanel } from "../payments/PaymentPanel";
 import { ProductForm } from "../products/ProductForm";
+import { InvoicePdfPreview } from "./InvoicePdfPreview";
 import {
   cancelInvoice,
   createCustomer,
@@ -23,6 +24,7 @@ import {
   updateDraftInvoice,
 } from "../../lib/tauri/commands";
 import { useCurrency } from "../../hooks/useCurrency";
+import { useInvoicePdf } from "../../hooks/useInvoicePdf";
 import {
   formatThousandthsAsQuantity,
   formatBasisPointsAsPercent,
@@ -124,6 +126,10 @@ export function InvoiceEditor({
   const [products, setProducts] = useState<ProductListItem[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [defaultTaxRateId, setDefaultTaxRateId] = useState<number | null>(null);
+  // Only India's GST model is implemented, so the CGST/SGST-vs-IGST breakdown
+  // is shown only for India — and the PDF makes exactly the same call
+  // (`domain::invoice_pdf`), so the screen and the printed document agree.
+  const [countryCode, setCountryCode] = useState("IN");
   const [numberPreview, setNumberPreview] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
@@ -133,6 +139,8 @@ export function InvoiceEditor({
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [duplicating, setDuplicating] = useState(false);
+  const [savedPdfPath, setSavedPdfPath] = useState<string | null>(null);
+  const pdf = useInvoicePdf();
 
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [invoiceDate, setInvoiceDate] = useState("");
@@ -160,6 +168,7 @@ export function InvoiceEditor({
         setProducts(prods);
         setTaxRates(rates);
         setDefaultTaxRateId(settings.default_tax_rate_id);
+        setCountryCode(settings.country_code);
         setCustomerId(inv.customer_id);
         setInvoiceDate(inv.invoice_date);
         setDueDate(inv.due_date);
@@ -335,6 +344,7 @@ export function InvoiceEditor({
     }
   };
 
+  /** Returns whether the invoice actually got issued, so "Issue & PDF" can stop here on failure. */
   const handleIssue = async () => {
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     setError(null);
@@ -344,11 +354,54 @@ export function InvoiceEditor({
       const issued = await issueInvoice(invoice.id, useCustomNumber && customNumber.trim() !== "" ? customNumber.trim() : null);
       setInvoice(issued);
       setLines(toEditableLines(issued, formatMinor));
+      return true;
     } catch (err) {
       setError(err);
+      return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  // Every PDF action renders from the invoice's *saved* state, so a pending
+  // autosave has to land first — otherwise "Save & PDF" on a just-edited
+  // draft would print the version from before the last keystroke.
+  const flushPendingEdits = async () => {
+    if (!isEditable) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const updated = await saveNow(buildInput());
+    setInvoice(updated);
+    setLines((prev) => mergeEditableLines(prev, updated, formatMinor));
+  };
+
+  const handlePreview = async () => {
+    setError(null);
+    setSavedPdfPath(null);
+    try {
+      await flushPendingEdits();
+    } catch (err) {
+      setError(err);
+      return;
+    }
+    await pdf.preview(invoice.id);
+  };
+
+  const handleSavePdf = async () => {
+    setError(null);
+    try {
+      await flushPendingEdits();
+    } catch (err) {
+      setError(err);
+      return;
+    }
+    const path = await pdf.saveAs(invoice.id, pdf.suggestedFileName(invoice.invoice_number, invoice.id));
+    if (path) setSavedPdfPath(path);
+  };
+
+  /** user-flows.md §5: "Save & PDF" — issue, then go straight to the PDF. */
+  const handleIssueAndPdf = async () => {
+    if (!(await handleIssue())) return;
+    await pdf.preview(invoice.id);
   };
 
   const handleDuplicate = async () => {
@@ -647,7 +700,12 @@ export function InvoiceEditor({
             <span className="text-slate-400">Discount</span>
             <span>-{symbol}{formatMinor(invoice.discount_amount_minor)}</span>
           </div>
-          {invoice.is_interstate ? (
+          {countryCode !== "IN" ? (
+            <div className="flex justify-between">
+              <span className="text-slate-400">Tax</span>
+              <span>+{symbol}{formatMinor(invoice.tax_amount_minor)}</span>
+            </div>
+          ) : invoice.is_interstate ? (
             <div className="flex justify-between">
               <span className="text-slate-400">IGST</span>
               <span>+{symbol}{formatMinor(splitGst(invoice.tax_amount_minor, true).igst)}</span>
@@ -680,11 +738,25 @@ export function InvoiceEditor({
             {saving ? "Saving…" : "Save Draft"}
           </button>
           <button
+            onClick={() => void handlePreview()}
+            disabled={saving || pdf.busy}
+            className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50"
+          >
+            {pdf.busy ? "Rendering…" : "Preview"}
+          </button>
+          <button
             onClick={handleIssue}
             disabled={saving || customerId === null || lines.length === 0}
             className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50"
           >
             {saving ? "Issuing…" : "Issue"}
+          </button>
+          <button
+            onClick={() => void handleIssueAndPdf()}
+            disabled={saving || pdf.busy || customerId === null || lines.length === 0}
+            className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50"
+          >
+            Issue &amp; PDF
           </button>
         </div>
       )}
@@ -693,6 +765,20 @@ export function InvoiceEditor({
         <div className="flex gap-2">
           <button onClick={handleSave} disabled={saving} className="rounded bg-slate-700 px-4 py-2 font-medium disabled:opacity-50">
             {saving ? "Saving…" : "Save Changes"}
+          </button>
+          <button
+            onClick={() => void handleSavePdf()}
+            disabled={pdf.busy}
+            className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50"
+          >
+            {pdf.busy ? "Rendering…" : "Print / Save PDF"}
+          </button>
+          <button
+            onClick={() => void handlePreview()}
+            disabled={pdf.busy}
+            className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50"
+          >
+            Preview
           </button>
           <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50">
             {duplicating ? "Duplicating…" : "Duplicate"}
@@ -714,6 +800,15 @@ export function InvoiceEditor({
           <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50">
             {duplicating ? "Duplicating…" : "Duplicate"}
           </button>
+          {/* A cancelled invoice still prints — stamped CANCELLED — because the
+              copy already sent to the customer has to be answerable. */}
+          <button
+            onClick={() => void handlePreview()}
+            disabled={pdf.busy}
+            className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50"
+          >
+            Preview
+          </button>
         </div>
       )}
 
@@ -723,6 +818,19 @@ export function InvoiceEditor({
           invoiceStatus={invoice.status}
           totalMinor={invoice.total_minor}
           onChanged={reloadInvoiceAfterPaymentChange}
+        />
+      )}
+
+      <ErrorBanner error={pdf.error} />
+      {savedPdfPath && <p className="text-sm text-emerald-400">Saved to {savedPdfPath}</p>}
+
+      {pdf.previewUrl && (
+        <InvoicePdfPreview
+          url={pdf.previewUrl}
+          title={pdf.previewTitle}
+          saving={pdf.busy}
+          onClose={pdf.closePreview}
+          onSave={() => void handleSavePdf()}
         />
       )}
 
