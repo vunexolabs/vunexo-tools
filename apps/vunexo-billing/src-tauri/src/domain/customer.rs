@@ -42,7 +42,10 @@ pub struct CustomerFields {
 
 /// `application-architecture.md` §3b's `CustomerListItem` — `has_invoices`
 /// drives the archive-vs-delete UI decision (`ui-ux.md` §3) and must be
-/// computed in SQL (`EXISTS`), never by loading invoices client-side.
+/// computed in SQL (`EXISTS`), never by loading invoices client-side. Also
+/// true when a Quote (not just an Invoice) references this customer —
+/// `quotes.customer_id` is `ON DELETE RESTRICT` too (migration 0002), so the
+/// name is kept for API stability but the check spans both tables.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct CustomerListItem {
     #[serde(flatten)]

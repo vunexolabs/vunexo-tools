@@ -29,11 +29,11 @@ export function ProductsList() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Products / Services</h1>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-slate-400">
+          <label className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
             <input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} />
             Show archived
           </label>
-          <button onClick={() => setEditing("new")} className="rounded bg-sky-600 px-3 py-1.5 text-sm font-medium">
+          <button onClick={() => setEditing("new")} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-3 py-1.5 text-sm font-medium">
             + New Product
           </button>
         </div>
@@ -57,53 +57,67 @@ export function ProductsList() {
         />
       )}
 
-      <table className="w-full text-left text-sm">
-        <thead className="text-slate-400">
-          <tr>
-            <th className="pb-2">Name</th>
-            <th className="pb-2">Unit</th>
-            <th className="pb-2">Price</th>
-            <th className="pb-2">Status</th>
-            <th className="pb-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {products?.map((p: ProductListItem) => (
-            <tr key={p.id} className="border-t border-slate-800">
-              <td className="py-2">{p.name}</td>
-              <td className="py-2 text-slate-400">{p.unit}</td>
-              <td className="py-2 text-slate-400">{symbol}{formatMinor(p.price_minor)}</td>
-              <td className="py-2">
-                <span className={p.status === "ARCHIVED" ? "text-slate-500" : "text-emerald-400"}>{p.status}</span>
-              </td>
-              <td className="py-2 text-right">
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setEditing(p)} className="text-sky-400 hover:underline">
-                    Edit
-                  </button>
-                  {p.status === "ACTIVE" ? (
-                    <button onClick={() => runRowAction(() => archive(p.id))} className="text-amber-400 hover:underline">
-                      Archive
-                    </button>
-                  ) : (
-                    <button onClick={() => runRowAction(() => restore(p.id))} className="text-emerald-400 hover:underline">
-                      Restore
-                    </button>
-                  )}
-                  {!p.has_invoices && (
-                    <button onClick={() => setDeleteTarget(p)} className="text-red-400 hover:underline">
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </td>
+      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-400">
+            <tr>
+              <th className="px-4 py-2.5 font-medium">Name</th>
+              <th className="px-4 py-2.5 font-medium">Unit</th>
+              <th className="px-4 py-2.5 font-medium">Price</th>
+              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="bg-white dark:bg-zinc-900">
+            {products?.map((p: ProductListItem) => (
+              <tr key={p.id} className="border-t border-zinc-200 dark:border-zinc-800">
+                <td className="px-4 py-2.5">{p.name}</td>
+                <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">{p.unit}</td>
+                <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">{symbol}{formatMinor(p.price_minor)}</td>
+                <td className="px-4 py-2.5">
+                  <span className={p.status === "ARCHIVED" ? "text-zinc-400 dark:text-zinc-500" : "text-green-600 dark:text-green-400"}>{p.status}</span>
+                </td>
+                <td className="px-4 py-2.5 text-right">
+                  <div className="flex flex-wrap justify-end gap-1">
+                    <button
+                      onClick={() => setEditing(p)}
+                      className="rounded-md px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                    >
+                      Edit
+                    </button>
+                    {p.status === "ACTIVE" ? (
+                      <button
+                        onClick={() => runRowAction(() => archive(p.id))}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
+                      >
+                        Archive
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => runRowAction(() => restore(p.id))}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-500/10"
+                      >
+                        Restore
+                      </button>
+                    )}
+                    {!p.has_invoices && (
+                      <button
+                        onClick={() => setDeleteTarget(p)}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {products !== null && products.length === 0 && (
-        <p className="text-sm text-slate-500">No products yet — click "+ New Product" to add one.</p>
+        <p className="text-sm text-zinc-400 dark:text-zinc-500">No products yet — click "+ New Product" to add one.</p>
       )}
 
       {deleteTarget && (

@@ -20,18 +20,13 @@
 use chrono::NaiveDate;
 
 use super::business::Business;
-use super::calculation::split_gst;
+use super::calculation::{present_vat, split_gst};
 use super::currency::{currency_meta, format_minor};
 use super::customer::Customer;
 use super::invoice::{DiscountType, Invoice, InvoiceStatus};
 use super::invoice_line_item::InvoiceLineItem;
 use super::settings::Settings;
-
-/// The tax model whose vocabulary the totals block uses. Only India's GST is
-/// implemented (`.ai/product.md` V1 scope, and the "known gaps" note in
-/// `.ai/progress/CURRENT.md`); everywhere else a single neutral "Tax" line is
-/// printed rather than inventing a regime this app does not actually compute.
-const INDIA_COUNTRY_CODE: &str = "IN";
+use super::tax_regime::TaxRegimeCode;
 
 /// What became of a business logo the user chose. The renderer skips a logo
 /// it cannot load rather than failing the invoice — which is the right call
@@ -162,6 +157,18 @@ pub fn build_invoice_pdf_document(input: InvoicePdfInput<'_>) -> InvoicePdfDocum
     let has_gstin = business.details.iter().any(|(label, _)| label == "GSTIN");
     let title = if has_gstin { "TAX INVOICE" } else { "INVOICE" };
 
+    // application-architecture-v2.md §4d: an issued document prints its own
+    // frozen `tax_regime_snapshot`, exactly like every other snapshot field
+    // (never today's `live_business.tax_regime_code`, which may have since
+    // changed). A Draft preview has no snapshot yet, so it falls back to the
+    // business's *current* regime — same "Draft always reflects current
+    // business regime" rule already applied to every other live-record
+    // fallback in this file (`snapshot_or_live`).
+    let regime = invoice
+        .tax_regime_snapshot
+        .or_else(|| live_business.map(|b| b.tax_regime_code))
+        .unwrap_or_default();
+
     InvoicePdfDocument {
         title: title.to_string(),
         watermark: watermark_for(invoice.status),
@@ -174,7 +181,7 @@ pub fn build_invoice_pdf_document(input: InvoicePdfInput<'_>) -> InvoicePdfDocum
         customer,
         meta: build_meta(invoice, settings),
         line_items: build_line_items(line_items, &money),
-        totals: build_totals(invoice, settings, amount_paid_minor, &money),
+        totals: build_totals(invoice, regime, amount_paid_minor, &money),
         notes: non_empty(invoice.notes.as_deref()),
         terms: non_empty(invoice.terms.as_deref()),
         payment_details: build_payment_details(invoice, live_business),
@@ -364,7 +371,7 @@ fn line_discount_note(li: &InvoiceLineItem, money: &dyn Fn(i64) -> String) -> Op
 
 fn build_totals(
     invoice: &Invoice,
-    settings: &Settings,
+    regime: TaxRegimeCode,
     amount_paid_minor: i64,
     money: &dyn Fn(i64) -> String,
 ) -> Vec<PdfTotalRow> {
@@ -390,7 +397,7 @@ fn build_totals(
         });
     }
 
-    rows.extend(tax_rows(invoice, settings, money));
+    rows.extend(tax_rows(invoice, regime, money));
 
     rows.push(PdfTotalRow {
         label: "Total".to_string(),
@@ -416,46 +423,55 @@ fn build_totals(
     rows
 }
 
-/// calculation-engine.md §5 — one blended split of the already-final
-/// `tax_amount_minor`, at the invoice level. Outside India the same total is
-/// printed under a single neutral label, because this app does not compute
-/// any other country's tax breakdown (see `INDIA_COUNTRY_CODE`).
+/// calculation-engine.md §5 / calculation-engine-v2.md §3 — the presentation
+/// split of the already-final `tax_amount_minor`, dispatched on the
+/// document's own tax regime (never `settings.country_code`, which is a
+/// separate, currency-display-only setting — ui-ux-v2.md §3's "one switch
+/// point" rule applies to the backend's own rendering code too, not just the
+/// frontend). `IN_GST` prints the existing CGST/SGST/IGST split;
+/// `VAT_STANDARD` has no intrastate/interstate-equivalent split, so it prints
+/// one neutral `VAT` line via `present_vat`.
 fn tax_rows(
     invoice: &Invoice,
-    settings: &Settings,
+    regime: TaxRegimeCode,
     money: &dyn Fn(i64) -> String,
 ) -> Vec<PdfTotalRow> {
     if invoice.tax_amount_minor == 0 {
         return Vec::new();
     }
-    if settings.country_code != INDIA_COUNTRY_CODE {
-        return vec![PdfTotalRow {
-            label: "Tax".to_string(),
-            amount: money(invoice.tax_amount_minor),
-            weight: TotalWeight::Normal,
-        }];
-    }
 
-    let split = split_gst(invoice.tax_amount_minor, invoice.is_interstate);
-    if invoice.is_interstate {
-        vec![PdfTotalRow {
-            label: "IGST".to_string(),
-            amount: money(split.igst),
-            weight: TotalWeight::Normal,
-        }]
-    } else {
-        vec![
-            PdfTotalRow {
-                label: "CGST".to_string(),
-                amount: money(split.cgst),
+    match regime {
+        TaxRegimeCode::VatStandard => {
+            let vat = present_vat(invoice.tax_amount_minor);
+            vec![PdfTotalRow {
+                label: "VAT".to_string(),
+                amount: money(vat.vat_amount_minor),
                 weight: TotalWeight::Normal,
-            },
-            PdfTotalRow {
-                label: "SGST".to_string(),
-                amount: money(split.sgst),
-                weight: TotalWeight::Normal,
-            },
-        ]
+            }]
+        }
+        TaxRegimeCode::InGst => {
+            let split = split_gst(invoice.tax_amount_minor, invoice.is_interstate);
+            if invoice.is_interstate {
+                vec![PdfTotalRow {
+                    label: "IGST".to_string(),
+                    amount: money(split.igst),
+                    weight: TotalWeight::Normal,
+                }]
+            } else {
+                vec![
+                    PdfTotalRow {
+                        label: "CGST".to_string(),
+                        amount: money(split.cgst),
+                        weight: TotalWeight::Normal,
+                    },
+                    PdfTotalRow {
+                        label: "SGST".to_string(),
+                        amount: money(split.sgst),
+                        weight: TotalWeight::Normal,
+                    },
+                ]
+            }
+        }
     }
 }
 
@@ -828,20 +844,58 @@ mod tests {
     }
 
     #[test]
-    fn outside_india_the_same_tax_total_prints_under_a_neutral_label() {
-        // Only India's GST model is implemented — the PDF must not invent a
-        // CGST/SGST breakdown for a country this app doesn't compute tax for.
+    fn in_gst_regime_prints_the_gst_split_regardless_of_country_code() {
+        // Regime dispatch keys off `tax_regime_snapshot`, never
+        // `settings.country_code` (a separate, currency-display-only
+        // setting) — an IN_GST business's `country_code` could be anything.
         let doc = build(
-            &issued_invoice(),
+            &issued_invoice(), // tax_regime_snapshot = Some(InGst)
             &[line_item("Widget", 1800)],
             &settings("US", "USD"),
             None,
             None,
             0,
         );
-        assert_eq!(total_labelled(&doc, "Tax").unwrap().amount, "360.00");
+        assert_eq!(total_labelled(&doc, "CGST").unwrap().amount, "180.00");
+        assert_eq!(total_labelled(&doc, "SGST").unwrap().amount, "180.00");
+        assert!(total_labelled(&doc, "Tax").is_none());
+    }
+
+    #[test]
+    fn vat_standard_regime_prints_a_single_vat_line_regardless_of_country_code() {
+        let mut invoice = issued_invoice();
+        invoice.tax_regime_snapshot = Some(TaxRegimeCode::VatStandard);
+        let doc = build(
+            &invoice,
+            &[line_item("Widget", 1800)],
+            &settings("IN", "INR"),
+            None,
+            None,
+            0,
+        );
+        assert_eq!(total_labelled(&doc, "VAT").unwrap().amount, "360.00");
         assert!(total_labelled(&doc, "CGST").is_none());
         assert!(total_labelled(&doc, "IGST").is_none());
+        assert!(total_labelled(&doc, "Tax").is_none());
+    }
+
+    #[test]
+    fn a_draft_preview_with_no_snapshot_falls_back_to_the_live_businesss_current_regime() {
+        // application-architecture-v2.md §4d: a Draft has no regime snapshot
+        // of its own — a preview must reflect the business's *current*
+        // regime, not silently default to IN_GST.
+        let invoice = draft_invoice(); // tax_regime_snapshot = None
+        let mut business = live_business();
+        business.tax_regime_code = TaxRegimeCode::VatStandard;
+        let doc = build(
+            &invoice,
+            &[line_item("Widget", 1800)],
+            &settings("IN", "INR"),
+            Some(&business),
+            None,
+            0,
+        );
+        assert_eq!(total_labelled(&doc, "VAT").unwrap().amount, "360.00");
     }
 
     #[test]

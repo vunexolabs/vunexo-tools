@@ -32,7 +32,7 @@ export function CustomerDetail({ customerId, onBack }: { customerId: number; onB
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="text-sm text-slate-400 hover:underline">
+      <button onClick={onBack} className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors hover:underline">
         ← Back to Customers
       </button>
 
@@ -46,7 +46,7 @@ export function CustomerDetail({ customerId, onBack }: { customerId: number; onB
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`rounded px-3 py-1.5 ${tab === t ? "bg-slate-800" : "text-slate-400 hover:bg-slate-900"}`}
+                className={`rounded-md px-3 py-1.5 transition-colors ${tab === t ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}
               >
                 {t === "OVERVIEW" ? "Overview" : "Statement"}
               </button>
@@ -86,7 +86,7 @@ function OverviewTab({ customer, onSaved }: { customer: Customer; onSaved: (c: C
       <Field label="Address" value={customer.address} />
       <Field label="GSTIN" value={customer.gstin} />
       <Field label="Status" value={customer.status} />
-      <button onClick={() => setEditing(true)} className="mt-2 rounded border border-slate-700 px-4 py-2 text-sm font-medium">
+      <button onClick={() => setEditing(true)} className="mt-2 rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium">
         Edit
       </button>
     </div>
@@ -95,8 +95,8 @@ function OverviewTab({ customer, onSaved }: { customer: Customer; onSaved: (c: C
 
 function Field({ label, value }: { label: string; value: string | null }) {
   return (
-    <div className="flex justify-between border-b border-slate-800 py-1">
-      <span className="text-slate-400">{label}</span>
+    <div className="flex justify-between border-b border-zinc-200 dark:border-zinc-800 py-1">
+      <span className="text-zinc-500 dark:text-zinc-400">{label}</span>
       <span>{value ?? "—"}</span>
     </div>
   );
@@ -162,33 +162,33 @@ function StatementTab({ customer }: { customer: Customer }) {
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label className="flex flex-col gap-1">
           From
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
         <label className="flex flex-col gap-1">
           To
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
-        <button onClick={() => void run()} disabled={busy} className="rounded bg-sky-600 px-4 py-1.5 font-medium disabled:opacity-50">
+        <button onClick={() => void run()} disabled={busy} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-1.5 font-medium disabled:opacity-50">
           {busy ? "Running…" : "Refresh"}
         </button>
       </div>
 
       <ErrorBanner error={error} />
-      {done && <p className="text-sm text-emerald-400">{done}</p>}
+      {done && <p className="text-sm text-green-600 dark:text-green-400">{done}</p>}
 
       {result && (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-400">
-              Opening balance: <span className="font-semibold text-slate-200">{symbol}{formatMinor(result.opening_balance_minor)}</span>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Opening balance: <span className="font-semibold text-zinc-900 dark:text-zinc-100">{symbol}{formatMinor(result.opening_balance_minor)}</span>
             </p>
-            <button onClick={() => void handleExport()} disabled={exporting} className="rounded border border-slate-700 px-3 py-1.5 text-sm disabled:opacity-50">
+            <button onClick={() => void handleExport()} disabled={exporting} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm disabled:opacity-50">
               {exporting ? "Exporting…" : "Export CSV"}
             </button>
           </div>
 
           <table className="w-full text-left text-sm">
-            <thead className="text-slate-400">
+            <thead className="text-zinc-500 dark:text-zinc-400">
               <tr>
                 <th className="pb-2">Date</th>
                 <th className="pb-2">Type</th>
@@ -198,11 +198,11 @@ function StatementTab({ customer }: { customer: Customer }) {
             </thead>
             <tbody>
               {result.entries.map((entry, i) => (
-                <tr key={i} className="border-t border-slate-800">
+                <tr key={i} className="border-t border-zinc-200 dark:border-zinc-800">
                   <td className="py-2">{entry.date}</td>
-                  <td className="py-2 text-slate-400">{entry.kind === "INVOICE" ? "Invoice" : "Payment"}</td>
-                  <td className="py-2 text-slate-400">{entry.reference ?? "—"}</td>
-                  <td className="py-2 text-slate-400">
+                  <td className="py-2 text-zinc-500 dark:text-zinc-400">{entry.kind === "INVOICE" ? "Invoice" : "Payment"}</td>
+                  <td className="py-2 text-zinc-500 dark:text-zinc-400">{entry.reference ?? "—"}</td>
+                  <td className="py-2 text-zinc-500 dark:text-zinc-400">
                     {entry.kind === "PAYMENT" ? "-" : ""}
                     {symbol}
                     {formatMinor(entry.amount_minor)}
@@ -211,7 +211,7 @@ function StatementTab({ customer }: { customer: Customer }) {
               ))}
               {result.entries.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="py-4 text-center text-slate-500">
+                  <td colSpan={4} className="py-4 text-center text-zinc-400 dark:text-zinc-500">
                     No activity in this range.
                   </td>
                 </tr>
@@ -219,7 +219,7 @@ function StatementTab({ customer }: { customer: Customer }) {
             </tbody>
           </table>
 
-          <div className="flex justify-between border-t border-slate-700 pt-2 text-base font-semibold">
+          <div className="flex justify-between border-t border-zinc-300 dark:border-zinc-700 pt-2 text-base font-semibold">
             <span>Closing Balance</span>
             <span>{symbol}{formatMinor(result.closing_balance_minor)}</span>
           </div>

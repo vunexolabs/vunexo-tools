@@ -75,6 +75,7 @@ mod integration_tests {
         invoices: InvoiceUseCases,
         customers: CustomerUseCases,
         business: BusinessUseCases,
+        pool: sqlx::SqlitePool,
         db_path: std::path::PathBuf,
     }
 
@@ -109,7 +110,7 @@ mod integration_tests {
         let report_repo: Arc<dyn ReportRepository> =
             Arc::new(SqliteReportRepository::new(pool.clone()));
         let sequencer: Arc<dyn InvoiceNumberSequencer> =
-            Arc::new(SqliteInvoiceNumberSequencer::new(pool));
+            Arc::new(SqliteInvoiceNumberSequencer::new(pool.clone()));
 
         TestApp {
             reports: ReportUseCases::new(report_repo),
@@ -128,6 +129,7 @@ mod integration_tests {
                 Arc::new(crate::infrastructure::filesystem::file_writer::StdFileWriter::new()),
                 db_path.parent().unwrap().to_path_buf(),
             ),
+            pool,
             db_path,
         }
     }
@@ -274,7 +276,18 @@ mod integration_tests {
             .unwrap();
         let today = chrono::Utc::now().date_naive();
 
-        issue(&app, customer.id, 1000, 1800, today).await; // tax = 180
+        issue(&app, customer.id, 1000, 1800, today).await; // IN_GST, tax = 180
+
+        // database-schema-v2.md §7 / user-flows-v2.md §5's mixed-regime edge
+        // case: a range spanning a regime switch must report two separate
+        // `by_regime` rows, never silently summed together. A business's
+        // regime is forward-looking only (issued invoices keep their own
+        // frozen `tax_regime_snapshot`), so switching it here must not alter
+        // the invoice already issued above.
+        let mut business = app.business.get_business().await.unwrap().unwrap();
+        business.tax_regime_code = TaxRegimeCode::VatStandard;
+        app.business.update_business(business).await.unwrap();
+        issue(&app, customer.id, 2000, 2000, today).await; // VAT_STANDARD, tax = 400
 
         // A cancelled invoice must not contribute.
         let draft = app
@@ -321,11 +334,126 @@ mod integration_tests {
             .unwrap();
 
         assert_eq!(
-            summary.total_tax_minor, 18_000,
-            "only the non-cancelled invoice's tax"
+            summary.total_tax_minor, 58_000,
+            "both non-cancelled invoices' tax, across both regimes"
         );
-        assert_eq!(summary.by_regime.len(), 1);
-        assert_eq!(summary.by_regime[0].tax_regime, TaxRegimeCode::InGst);
-        assert_eq!(summary.by_regime[0].tax_amount_minor, 18_000);
+        assert_eq!(
+            summary.by_regime.len(),
+            2,
+            "two distinct regime rows, not merged"
+        );
+        let in_gst_row = summary
+            .by_regime
+            .iter()
+            .find(|r| r.tax_regime == TaxRegimeCode::InGst)
+            .expect("an IN_GST row");
+        assert_eq!(in_gst_row.tax_amount_minor, 18_000);
+        let vat_row = summary
+            .by_regime
+            .iter()
+            .find(|r| r.tax_regime == TaxRegimeCode::VatStandard)
+            .expect("a VAT_STANDARD row");
+        assert_eq!(vat_row.tax_amount_minor, 40_000);
+    }
+
+    /// migration 0002 added `tax_regime_snapshot` with no backfill, so a
+    /// pre-V2 invoice has it `NULL` while every post-V2 `IN_GST` invoice has
+    /// it explicitly `'IN_GST'`. Both normalize to the same regime
+    /// (`normalize_legacy_snapshot`) and must land in one merged row, not a
+    /// NULL-bucket row split from the explicit-'IN_GST' bucket.
+    #[tokio::test]
+    async fn tax_summary_merges_legacy_null_regime_with_explicit_in_gst() {
+        let app = setup().await;
+        app.business
+            .create_business(Business {
+                name: "Vunexo Test Co".into(),
+                logo_path: None,
+                address: None,
+                phone: None,
+                email: None,
+                gstin: None,
+                bank_details: None,
+                upi_id: None,
+                tax_regime_code: TaxRegimeCode::InGst,
+            })
+            .await
+            .unwrap();
+        let customer = app
+            .customers
+            .create_customer(CustomerFields {
+                name: "Legacy Regime Customer".into(),
+                phone: None,
+                email: None,
+                address: None,
+                gstin: None,
+            })
+            .await
+            .unwrap();
+        let today = chrono::Utc::now().date_naive();
+
+        issue(&app, customer.id, 1000, 1800, today).await; // tax = 180, snapshot 'IN_GST'
+
+        let draft = app
+            .invoices
+            .create_draft_invoice(DraftInvoiceInput {
+                customer_id: Some(customer.id),
+                invoice_date: today,
+                due_date: None,
+                notes: None,
+                terms: None,
+                is_interstate: false,
+                discount_type: None,
+                discount_value: None,
+                line_items: vec![LineItemInput {
+                    product_id: None,
+                    description: "Legacy item".into(),
+                    unit: "pcs".into(),
+                    quantity_thousandths: 1000,
+                    unit_price_minor: 200_000,
+                    line_discount_type: None,
+                    line_discount_value: None,
+                    tax_rate_id: None,
+                    tax_rate_basis_points: 1800,
+                }],
+            })
+            .await
+            .unwrap();
+        let legacy_issued = app
+            .invoices
+            .issue_invoice(draft.invoice.id, None)
+            .await
+            .unwrap();
+        // Simulate a real pre-V2 invoice: the column exists (added by
+        // migration 0002) but was never backfilled, so it's NULL rather than
+        // an explicit regime string — this is the one place this test module
+        // reaches past the application layer, deliberately, since no use
+        // case can otherwise produce a NULL snapshot on an issued invoice.
+        sqlx::query("UPDATE invoices SET tax_regime_snapshot = NULL WHERE id = ?")
+            .bind(legacy_issued.invoice.id)
+            .execute(&app.pool)
+            .await
+            .expect("null out tax_regime_snapshot to simulate a legacy row");
+
+        let start = today;
+        let end = today + chrono::Duration::days(1);
+        let summary = app
+            .reports
+            .generate_tax_summary_report(start, end)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            summary.total_tax_minor,
+            18_000 + 36_000,
+            "both invoices' tax, regardless of which are legacy-NULL"
+        );
+        assert_eq!(
+            summary.by_regime.len(),
+            1,
+            "the legacy-NULL and explicit-IN_GST invoices must merge into one row, not split into two"
+        );
+        let row = &summary.by_regime[0];
+        assert_eq!(row.tax_regime, TaxRegimeCode::InGst);
+        assert_eq!(row.tax_amount_minor, 18_000 + 36_000);
     }
 }

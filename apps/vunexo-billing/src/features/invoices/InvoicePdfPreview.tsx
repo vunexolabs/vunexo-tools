@@ -27,18 +27,18 @@ export function InvoicePdfPreview({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
-          <h2 className="text-sm font-medium text-slate-200">{title}</h2>
+      <div className="mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+        <div className="flex items-center justify-between border-b border-zinc-300 dark:border-zinc-700 px-4 py-3">
+          <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{title}</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={onSave}
               disabled={saving}
-              className="rounded bg-sky-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+              className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save PDF"}
             </button>
-            <button onClick={onClose} className="rounded border border-slate-700 px-3 py-1.5 text-sm">
+            <button onClick={onClose} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm">
               Close
             </button>
           </div>

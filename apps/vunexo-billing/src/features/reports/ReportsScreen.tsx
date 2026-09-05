@@ -25,7 +25,7 @@ export function ReportsScreen() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`rounded px-3 py-1.5 ${tab === t.id ? "bg-slate-800" : "text-slate-400 hover:bg-slate-900"}`}
+            className={`rounded-md px-3 py-1.5 transition-colors ${tab === t.id ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}
           >
             {t.label}
           </button>

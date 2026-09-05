@@ -97,7 +97,7 @@ export function InvoicesList({
         <button
           onClick={handleNewInvoice}
           disabled={creating}
-          className="rounded bg-sky-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
         >
           {creating ? "Creating…" : "+ New Invoice"}
         </button>
@@ -108,7 +108,7 @@ export function InvoicesList({
           <button
             key={f.label}
             onClick={() => onFilterChange(f.value)}
-            className={`rounded px-2 py-1 ${filter === f.value ? "bg-slate-800" : "text-slate-400 hover:bg-slate-900"}`}
+            className={`rounded-md px-2 py-1 transition-colors ${filter === f.value ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}
           >
             {f.label}
           </button>
@@ -118,105 +118,110 @@ export function InvoicesList({
       <ErrorBanner error={error} />
       <ErrorBanner error={rowError} />
 
-      <table className="w-full text-left text-sm">
-        <thead className="text-slate-400">
-          <tr>
-            <th className="pb-2">Number</th>
-            <th className="pb-2">Customer</th>
-            <th className="pb-2">Date</th>
-            <th className="pb-2">Total</th>
-            <th className="pb-2">Status</th>
-            <th className="pb-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoices?.map((inv) => (
-            <Fragment key={inv.id}>
-              <tr className="border-t border-slate-800">
-                <td className="py-2">
-                  <button onClick={() => onOpen(inv.id)} className="text-sky-400 hover:underline">
-                    {inv.invoice_number ?? `Draft #${inv.id}`}
-                  </button>
-                </td>
-                <td className="py-2 text-slate-400">{inv.customer_name ?? "—"}</td>
-                <td className="py-2 text-slate-400">{inv.invoice_date}</td>
-                <td className="py-2 text-slate-400">{symbol}{formatMinor(inv.total_minor)}</td>
-                <td className="py-2">
-                  <StatusBadge status={inv.status} isOverdue={inv.is_overdue} />
-                </td>
-                <td className="py-2 text-right">
-                  <div className="flex justify-end gap-2">
-                    {inv.status === "DRAFT" && (
-                      <button onClick={() => setDeleteTargetId(inv.id)} className="text-red-400 hover:underline">
-                        Delete
-                      </button>
-                    )}
-                    {(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID") && (
-                      <button
-                        onClick={() => setPaymentPanelFor(paymentPanelFor === inv.id ? null : inv.id)}
-                        className="text-emerald-400 hover:underline"
-                      >
-                        {paymentPanelFor === inv.id ? "Close" : "Record Payment"}
-                      </button>
-                    )}
-                    {(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID" || inv.status === "PAID") && (
-                      <button
-                        onClick={() => {
-                          setCancelReason("");
-                          setCancelTargetId(inv.id);
-                        }}
-                        className="text-amber-400 hover:underline"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                    {inv.is_overdue && (
-                      <button
-                        onClick={() => setRemindInvoice({ id: inv.id, number: inv.invoice_number })}
-                        className="text-red-400 hover:underline"
-                      >
-                        Remind
-                      </button>
-                    )}
-                    {inv.status !== "DRAFT" && (
-                      <button
-                        onClick={() => {
-                          setPdfInvoice({ id: inv.id, number: inv.invoice_number });
-                          void pdf.preview(inv.id);
-                        }}
-                        disabled={pdf.busy}
-                        className="text-sky-400 hover:underline disabled:opacity-50"
-                      >
-                        PDF
-                      </button>
-                    )}
-                    {inv.status !== "DRAFT" && (
-                      <button
-                        onClick={() => runRowAction(async () => { const d = await duplicate(inv.id); onOpen(d.id); })}
-                        className="text-sky-400 hover:underline"
-                      >
-                        Duplicate
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-              {paymentPanelFor === inv.id && (
-                <tr className="border-t border-slate-800">
-                  <td colSpan={6} className="py-2">
-                    <PaymentPanel
-                      invoiceId={inv.id}
-                      invoiceStatus={inv.status}
-                      totalMinor={inv.total_minor}
-                      onChanged={reload}
-                    />
+      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-400">
+            <tr>
+              <th className="px-4 py-2.5 font-medium">Number</th>
+              <th className="px-4 py-2.5 font-medium">Customer</th>
+              <th className="px-4 py-2.5 font-medium">Date</th>
+              <th className="px-4 py-2.5 font-medium">Total</th>
+              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-zinc-900">
+            {invoices?.map((inv) => (
+              <Fragment key={inv.id}>
+                <tr className="border-t border-zinc-200 dark:border-zinc-800">
+                  <td className="px-4 py-2.5">
+                    <button onClick={() => onOpen(inv.id)} className="text-blue-600 dark:text-blue-400 transition-colors hover:underline">
+                      {inv.invoice_number ?? `Draft #${inv.id}`}
+                    </button>
+                  </td>
+                  <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">{inv.customer_name ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">{inv.invoice_date}</td>
+                  <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">{symbol}{formatMinor(inv.total_minor)}</td>
+                  <td className="px-4 py-2.5">
+                    <StatusBadge status={inv.status} isOverdue={inv.is_overdue} />
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {inv.status === "DRAFT" && (
+                        <button
+                          onClick={() => setDeleteTargetId(inv.id)}
+                          className="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                        >
+                          Delete
+                        </button>
+                      )}
+                      {(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID") && (
+                        <button
+                          onClick={() => setPaymentPanelFor(paymentPanelFor === inv.id ? null : inv.id)}
+                          className="rounded-md px-2 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-500/10"
+                        >
+                          {paymentPanelFor === inv.id ? "Close" : "Record Payment"}
+                        </button>
+                      )}
+                      {(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID" || inv.status === "PAID") && (
+                        <button
+                          onClick={() => {
+                            setCancelReason("");
+                            setCancelTargetId(inv.id);
+                          }}
+                          className="rounded-md px-2 py-1 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      {inv.is_overdue && (
+                        <button
+                          onClick={() => setRemindInvoice({ id: inv.id, number: inv.invoice_number })}
+                          className="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                        >
+                          Remind
+                        </button>
+                      )}
+                      {inv.status !== "DRAFT" && (
+                        <button
+                          onClick={() => {
+                            setPdfInvoice({ id: inv.id, number: inv.invoice_number });
+                            void pdf.preview(inv.id);
+                          }}
+                          disabled={pdf.busy}
+                          className="rounded-md px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 disabled:opacity-50 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                        >
+                          PDF
+                        </button>
+                      )}
+                      {inv.status !== "DRAFT" && (
+                        <button
+                          onClick={() => runRowAction(async () => { const d = await duplicate(inv.id); onOpen(d.id); })}
+                          className="rounded-md px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                        >
+                          Duplicate
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
-              )}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
+                {paymentPanelFor === inv.id && (
+                  <tr className="border-t border-zinc-200 dark:border-zinc-800">
+                    <td colSpan={6} className="px-4 py-2.5">
+                      <PaymentPanel
+                        invoiceId={inv.id}
+                        invoiceStatus={inv.status}
+                        totalMinor={inv.total_minor}
+                        onChanged={reload}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <ErrorBanner error={pdf.error} />
 
@@ -240,7 +245,7 @@ export function InvoicesList({
       )}
 
       {invoices !== null && invoices.length === 0 && (
-        <p className="text-sm text-slate-500">No invoices yet — click "+ New Invoice" to create one.</p>
+        <p className="text-sm text-zinc-400 dark:text-zinc-500">No invoices yet — click "+ New Invoice" to create one.</p>
       )}
 
       {deleteTargetId !== null && (
@@ -274,7 +279,7 @@ export function InvoicesList({
             <textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               rows={2}
             />
           </label>

@@ -76,15 +76,15 @@ export function SalesSummaryTab() {
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label className="flex flex-col gap-1">
           From
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
         <label className="flex flex-col gap-1">
           To
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
         <label className="flex flex-col gap-1">
           Group by
-          <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as SalesGrouping)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1">
+          <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as SalesGrouping)} className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
             {GROUPINGS.map((g) => (
               <option key={g.value} value={g.value}>
                 {g.label}
@@ -92,25 +92,25 @@ export function SalesSummaryTab() {
             ))}
           </select>
         </label>
-        <button onClick={() => void run()} disabled={busy} className="rounded bg-sky-600 px-4 py-1.5 font-medium disabled:opacity-50">
+        <button onClick={() => void run()} disabled={busy} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-1.5 font-medium disabled:opacity-50">
           {busy ? "Running…" : "Run Report"}
         </button>
       </div>
 
       <ErrorBanner error={error} />
-      {done && <p className="text-sm text-emerald-400">{done}</p>}
+      {done && <p className="text-sm text-green-600 dark:text-green-400">{done}</p>}
 
       {result && (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-400">
-              Total sales ({code}): <span className="font-semibold text-slate-200">{symbol}{formatMinor(result.total_sales_minor)}</span>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Total sales ({code}): <span className="font-semibold text-zinc-900 dark:text-zinc-100">{symbol}{formatMinor(result.total_sales_minor)}</span>
             </p>
             <div className="flex gap-2">
-              <button onClick={() => void handleExport("CSV")} disabled={exporting !== null} className="rounded border border-slate-700 px-3 py-1.5 text-sm disabled:opacity-50">
+              <button onClick={() => void handleExport("CSV")} disabled={exporting !== null} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm disabled:opacity-50">
                 {exporting === "CSV" ? "Exporting…" : "Export CSV"}
               </button>
-              <button onClick={() => void handleExport("JSON")} disabled={exporting !== null} className="rounded border border-slate-700 px-3 py-1.5 text-sm disabled:opacity-50">
+              <button onClick={() => void handleExport("JSON")} disabled={exporting !== null} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm disabled:opacity-50">
                 {exporting === "JSON" ? "Exporting…" : "Export JSON"}
               </button>
             </div>
@@ -118,7 +118,7 @@ export function SalesSummaryTab() {
 
           {groupBy !== "NONE" && (
             <table className="w-full text-left text-sm">
-              <thead className="text-slate-400">
+              <thead className="text-zinc-500 dark:text-zinc-400">
                 <tr>
                   <th className="pb-2">{groupBy === "PRODUCT" ? "Product" : "Customer"}</th>
                   <th className="pb-2">Sales</th>
@@ -126,14 +126,14 @@ export function SalesSummaryTab() {
               </thead>
               <tbody>
                 {result.rows.map((row) => (
-                  <tr key={row.label} className="border-t border-slate-800">
+                  <tr key={row.label} className="border-t border-zinc-200 dark:border-zinc-800">
                     <td className="py-2">{row.label}</td>
-                    <td className="py-2 text-slate-400">{symbol}{formatMinor(row.sales_minor)}</td>
+                    <td className="py-2 text-zinc-500 dark:text-zinc-400">{symbol}{formatMinor(row.sales_minor)}</td>
                   </tr>
                 ))}
                 {result.rows.length === 0 && (
                   <tr>
-                    <td colSpan={2} className="py-4 text-center text-slate-500">
+                    <td colSpan={2} className="py-4 text-center text-zinc-400 dark:text-zinc-500">
                       No sales in this range.
                     </td>
                   </tr>

@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+/* Theme toggle shouldn't feel abrupt, but this must stay cheap — only the
+   properties that actually change between themes, never `all` (which would
+   also animate layout-affecting properties on every render). */
+* {
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}

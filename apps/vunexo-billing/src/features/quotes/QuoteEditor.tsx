@@ -23,12 +23,15 @@ import {
   previewNextQuoteNumber,
   updateDraftQuote,
 } from "../../lib/tauri/commands";
+import { useBusiness } from "../../hooks/useBusiness";
 import { useCurrency } from "../../hooks/useCurrency";
+import { useTaxRegimeFields } from "../../hooks/useTaxRegimeFields";
 import {
   formatThousandthsAsQuantity,
   formatBasisPointsAsPercent,
   parsePercentToBasisPoints,
   parseQuantityToThousandths,
+  presentVat,
   splitGst,
   type CustomerListItem,
   type DraftQuoteInput,
@@ -115,12 +118,12 @@ export function QuoteEditor({
   onConverted: (invoiceId: number) => void;
 }) {
   const { symbol, formatMinor, parseToMinor } = useCurrency();
+  const { business } = useBusiness();
   const [quote, setQuote] = useState<QuoteWithLineItems | null>(null);
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
   const [products, setProducts] = useState<ProductListItem[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [defaultTaxRateId, setDefaultTaxRateId] = useState<number | null>(null);
-  const [countryCode, setCountryCode] = useState("IN");
   const [numberPreview, setNumberPreview] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
@@ -142,6 +145,12 @@ export function QuoteEditor({
   const [discountStr, setDiscountStr] = useState("");
   const [lines, setLines] = useState<EditableLine[]>([]);
 
+  // application-architecture-v2.md §4d — same fallback rule as the Invoice
+  // Editor: an issued Quote prints its frozen snapshot, a Draft reflects the
+  // business's current regime.
+  const effectiveRegime = quote?.tax_regime_snapshot ?? business?.tax_regime_code ?? "IN_GST";
+  const taxFields = useTaxRegimeFields(effectiveRegime);
+
   useEffect(() => {
     Promise.all([
       getQuote(quoteId),
@@ -156,7 +165,6 @@ export function QuoteEditor({
         setProducts(prods);
         setTaxRates(rates);
         setDefaultTaxRateId(settings.default_tax_rate_id);
-        setCountryCode(settings.country_code);
         setCustomerId(q.customer_id);
         setQuoteDate(q.quote_date);
         setValidUntil(q.valid_until);
@@ -229,11 +237,11 @@ export function QuoteEditor({
   if (!quote) {
     return (
       <div>
-        <button onClick={onBack} className="mb-4 text-sm text-slate-400 hover:underline">
+        <button onClick={onBack} className="mb-4 text-sm text-zinc-500 dark:text-zinc-400 transition-colors hover:underline">
           ← Back
         </button>
         <ErrorBanner error={error} />
-        {!error && <p className="text-slate-500">Loading…</p>}
+        {!error && <p className="text-zinc-400 dark:text-zinc-500">Loading…</p>}
       </div>
     );
   }
@@ -376,7 +384,7 @@ export function QuoteEditor({
 
   return (
     <div className="max-w-3xl space-y-4">
-      <button onClick={onBack} className="text-sm text-slate-400 hover:underline">
+      <button onClick={onBack} className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors hover:underline">
         ← Back
       </button>
 
@@ -387,15 +395,15 @@ export function QuoteEditor({
 
       <ErrorBanner error={error} />
 
-      {isCancelled && <p className="text-sm text-slate-500">Cancelled{quote.cancel_reason ? `: ${quote.cancel_reason}` : "."}</p>}
+      {isCancelled && <p className="text-sm text-zinc-400 dark:text-zinc-500">Cancelled{quote.cancel_reason ? `: ${quote.cancel_reason}` : "."}</p>}
       {isConverted && (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-zinc-400 dark:text-zinc-500">
           This quote has been converted to an invoice. (Open it from the Invoices list — quote-to-invoice cross-navigation
           isn't wired up yet.)
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 rounded border border-slate-700 bg-slate-900 p-4">
+      <div className="grid grid-cols-2 gap-4 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
         <div>
           <label className="block text-sm">Customer</label>
           {isEditable ? (
@@ -412,21 +420,21 @@ export function QuoteEditor({
               onCreateNew={() => setShowNewCustomerModal(true)}
             />
           ) : (
-            <p className="mt-1 text-sm text-slate-400">{quote.customer_snapshot_name ?? "—"}</p>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{quote.customer_snapshot_name ?? "—"}</p>
           )}
         </div>
 
         <div>
           {isDraft ? (
             numberPreview && (
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Next quote number • automatic
                 <br />
-                <span className="text-slate-300">{numberPreview}</span>
+                <span className="text-zinc-900 dark:text-zinc-100">{numberPreview}</span>
               </p>
             )
           ) : (
-            <p className="text-sm text-slate-400">Quote number (immutable): {quote.quote_number}</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Quote number (immutable): {quote.quote_number}</p>
           )}
         </div>
 
@@ -440,7 +448,7 @@ export function QuoteEditor({
               setQuoteDate(e.target.value);
               scheduleAutosave();
             }}
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60"
+            className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </label>
         <label className="block text-sm">
@@ -453,27 +461,29 @@ export function QuoteEditor({
               setValidUntil(e.target.value || null);
               scheduleAutosave();
             }}
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60"
+            className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </label>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            disabled={!isEditable}
-            checked={isInterstate}
-            onChange={(e) => {
-              setIsInterstate(e.target.checked);
-              scheduleAutosave();
-            }}
-          />
-          Interstate (IGST instead of CGST+SGST)
-        </label>
+        {taxFields.has("is_interstate") && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              disabled={!isEditable}
+              checked={isInterstate}
+              onChange={(e) => {
+                setIsInterstate(e.target.checked);
+                scheduleAutosave();
+              }}
+            />
+            Interstate (IGST instead of CGST+SGST)
+          </label>
+        )}
       </div>
 
-      <div className="rounded border border-slate-700 bg-slate-900 p-4">
+      <div className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
         <table className="w-full text-left text-sm">
-          <thead className="text-slate-400">
+          <thead className="text-zinc-500 dark:text-zinc-400">
             <tr>
               <th className="pb-2">Item</th>
               <th className="pb-2">Unit</th>
@@ -486,7 +496,7 @@ export function QuoteEditor({
           </thead>
           <tbody>
             {lines.map((l) => (
-              <tr key={l.key} className="border-t border-slate-800">
+              <tr key={l.key} className="border-t border-zinc-200 dark:border-zinc-800">
                 <td className="py-2 pr-2">
                   {isEditable ? (
                     <div className="space-y-1">
@@ -502,7 +512,7 @@ export function QuoteEditor({
                         value={l.description}
                         onChange={(e) => updateLine(l.key, { description: e.target.value })}
                         placeholder="Description"
-                        className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1"
+                        className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   ) : (
@@ -511,21 +521,21 @@ export function QuoteEditor({
                 </td>
                 <td className="py-2 pr-2">
                   {isEditable ? (
-                    <input value={l.unit} onChange={(e) => updateLine(l.key, { unit: e.target.value })} className="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+                    <input value={l.unit} onChange={(e) => updateLine(l.key, { unit: e.target.value })} className="w-16 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
                   ) : (
                     l.unit
                   )}
                 </td>
                 <td className="py-2 pr-2">
                   {isEditable ? (
-                    <input value={l.quantityStr} onChange={(e) => updateLine(l.key, { quantityStr: e.target.value })} className="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+                    <input value={l.quantityStr} onChange={(e) => updateLine(l.key, { quantityStr: e.target.value })} className="w-16 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
                   ) : (
                     l.quantityStr
                   )}
                 </td>
                 <td className="py-2 pr-2">
                   {isEditable ? (
-                    <input value={l.priceStr} onChange={(e) => updateLine(l.key, { priceStr: e.target.value })} className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+                    <input value={l.priceStr} onChange={(e) => updateLine(l.key, { priceStr: e.target.value })} className="w-20 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
                   ) : (
                     `${symbol}${l.priceStr}`
                   )}
@@ -543,7 +553,7 @@ export function QuoteEditor({
                           const rate = taxRates.find((r) => r.id === Number(e.target.value));
                           if (rate) updateLine(l.key, resolveTaxRate(taxRates, rate.id));
                         }}
-                        className="w-24 rounded border border-slate-700 bg-slate-950 px-1 py-1 text-xs"
+                        className="w-24 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                       >
                         {taxRates.map((r) => (
                           <option key={r.id} value={r.id}>
@@ -557,7 +567,7 @@ export function QuoteEditor({
                           value={l.taxStr}
                           onChange={(e) => updateLine(l.key, { taxStr: e.target.value })}
                           placeholder="%"
-                          className="w-12 rounded border border-slate-700 bg-slate-950 px-2 py-1"
+                          className="w-12 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                         />
                       )}
                     </div>
@@ -571,7 +581,7 @@ export function QuoteEditor({
                       <select
                         value={l.lineDiscountIsPercentage ? "PERCENTAGE" : "AMOUNT"}
                         onChange={(e) => updateLine(l.key, { lineDiscountIsPercentage: e.target.value === "PERCENTAGE" })}
-                        className="rounded border border-slate-700 bg-slate-950 px-1 py-1 text-xs"
+                        className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="AMOUNT">{symbol}</option>
                         <option value="PERCENTAGE">%</option>
@@ -580,7 +590,7 @@ export function QuoteEditor({
                         value={l.lineDiscountStr}
                         onChange={(e) => updateLine(l.key, { lineDiscountStr: e.target.value })}
                         placeholder="0"
-                        className="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1"
+                        className="w-16 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   ) : l.lineDiscountStr === "" ? (
@@ -593,7 +603,7 @@ export function QuoteEditor({
                 </td>
                 {isEditable && (
                   <td className="py-2">
-                    <button onClick={() => removeLine(l.key)} className="text-red-400 hover:underline">
+                    <button onClick={() => removeLine(l.key)} className="text-red-600 dark:text-red-400 transition-colors hover:underline">
                       Remove
                     </button>
                   </td>
@@ -603,14 +613,14 @@ export function QuoteEditor({
           </tbody>
         </table>
         {isEditable && (
-          <button onClick={addLine} className="mt-2 text-sm text-sky-400 hover:underline">
+          <button onClick={addLine} className="mt-2 text-sm text-blue-600 dark:text-blue-400 transition-colors hover:underline">
             + Add item
           </button>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2 rounded border border-slate-700 bg-slate-900 p-4">
+        <div className="space-y-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
           <label className="block text-sm">
             Discount
             {isEditable ? (
@@ -621,7 +631,7 @@ export function QuoteEditor({
                     setDiscountIsPercentage(e.target.value === "PERCENTAGE");
                     scheduleAutosave();
                   }}
-                  className="rounded border border-slate-700 bg-slate-950 px-2 py-2 text-sm"
+                  className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="AMOUNT">{symbol} Amount</option>
                   <option value="PERCENTAGE">% Percentage</option>
@@ -633,11 +643,11 @@ export function QuoteEditor({
                     scheduleAutosave();
                   }}
                   placeholder="0"
-                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             ) : (
-              <p className="text-slate-400">{discountStr === "" ? "None" : `${discountIsPercentage ? `${discountStr}%` : `${symbol}${discountStr}`}`}</p>
+              <p className="text-zinc-500 dark:text-zinc-400">{discountStr === "" ? "None" : `${discountIsPercentage ? `${discountStr}%` : `${symbol}${discountStr}`}`}</p>
             )}
           </label>
           <label className="block text-sm">
@@ -649,7 +659,7 @@ export function QuoteEditor({
                 setNotes(e.target.value);
                 scheduleAutosave();
               }}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60"
+              className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
           </label>
           <label className="block text-sm">
@@ -661,37 +671,37 @@ export function QuoteEditor({
                 setTerms(e.target.value);
                 scheduleAutosave();
               }}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 disabled:opacity-60"
+              className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
           </label>
         </div>
 
-        <div className="space-y-1 rounded border border-slate-700 bg-slate-900 p-4 text-sm">
+        <div className="space-y-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 text-sm">
           <div className="flex justify-between">
-            <span className="text-slate-400">Subtotal</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Subtotal</span>
             <span>
               {symbol}
               {formatMinor(quote.subtotal_minor)}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-400">Discount</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Discount</span>
             <span>
               -{symbol}
               {formatMinor(quote.discount_amount_minor)}
             </span>
           </div>
-          {countryCode !== "IN" ? (
+          {effectiveRegime === "VAT_STANDARD" ? (
             <div className="flex justify-between">
-              <span className="text-slate-400">Tax</span>
+              <span className="text-zinc-500 dark:text-zinc-400">VAT</span>
               <span>
                 +{symbol}
-                {formatMinor(quote.tax_amount_minor)}
+                {formatMinor(presentVat(quote.tax_amount_minor).vatAmountMinor)}
               </span>
             </div>
           ) : quote.is_interstate ? (
             <div className="flex justify-between">
-              <span className="text-slate-400">IGST</span>
+              <span className="text-zinc-500 dark:text-zinc-400">IGST</span>
               <span>
                 +{symbol}
                 {formatMinor(splitGst(quote.tax_amount_minor, true).igst)}
@@ -700,14 +710,14 @@ export function QuoteEditor({
           ) : (
             <>
               <div className="flex justify-between">
-                <span className="text-slate-400">CGST</span>
+                <span className="text-zinc-500 dark:text-zinc-400">CGST</span>
                 <span>
                   +{symbol}
                   {formatMinor(splitGst(quote.tax_amount_minor, false).cgst)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">SGST</span>
+                <span className="text-zinc-500 dark:text-zinc-400">SGST</span>
                 <span>
                   +{symbol}
                   {formatMinor(splitGst(quote.tax_amount_minor, false).sgst)}
@@ -715,7 +725,7 @@ export function QuoteEditor({
               </div>
             </>
           )}
-          <div className="mt-2 flex justify-between border-t border-slate-700 pt-2 text-base font-semibold">
+          <div className="mt-2 flex justify-between border-t border-zinc-300 dark:border-zinc-700 pt-2 text-base font-semibold">
             <span>Total</span>
             <span>
               {symbol}
@@ -723,20 +733,20 @@ export function QuoteEditor({
             </span>
           </div>
           {isEditable && (
-            <p className="pt-2 text-xs text-slate-500">{autoSaving ? "Recalculating totals…" : "Totals update automatically as you edit."}</p>
+            <p className="pt-2 text-xs text-zinc-400 dark:text-zinc-500">{autoSaving ? "Recalculating totals…" : "Totals update automatically as you edit."}</p>
           )}
         </div>
       </div>
 
       {isDraft && (
         <div className="flex gap-2">
-          <button onClick={handleSave} disabled={saving} className="rounded bg-slate-700 px-4 py-2 font-medium disabled:opacity-50">
+          <button onClick={handleSave} disabled={saving} className="rounded-md bg-zinc-200 px-4 py-2 font-medium text-zinc-900 transition-colors hover:bg-zinc-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600 dark:focus:ring-offset-zinc-900">
             {saving ? "Saving…" : "Save Draft"}
           </button>
           <button
             onClick={handleIssue}
             disabled={saving || customerId === null || lines.length === 0}
-            className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50"
+            className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-2 font-medium disabled:opacity-50"
           >
             {saving ? "Issuing…" : "Issue"}
           </button>
@@ -745,10 +755,10 @@ export function QuoteEditor({
 
       {quote.status === "ISSUED" && (
         <div className="flex gap-2">
-          <button onClick={() => void handleAccept()} disabled={saving} className="rounded bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50">
+          <button onClick={() => void handleAccept()} disabled={saving} className="rounded-md bg-green-600 px-4 py-2 font-medium text-white transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 dark:bg-green-600 dark:hover:bg-green-500 dark:focus:ring-offset-zinc-900">
             {saving ? "Saving…" : "Accept"}
           </button>
-          <button onClick={() => void handleDecline()} disabled={saving} className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50">
+          <button onClick={() => void handleDecline()} disabled={saving} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-medium disabled:opacity-50">
             Decline
           </button>
           <button
@@ -756,11 +766,11 @@ export function QuoteEditor({
               setCancelReason("");
               setShowCancelDialog(true);
             }}
-            className="rounded border border-amber-700 px-4 py-2 font-medium text-amber-400"
+            className="rounded-md border border-amber-300 px-4 py-2 font-medium text-amber-600 transition-colors hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950"
           >
             Cancel Quote
           </button>
-          <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50">
+          <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-medium disabled:opacity-50">
             {duplicating ? "Duplicating…" : "Duplicate"}
           </button>
         </div>
@@ -768,7 +778,7 @@ export function QuoteEditor({
 
       {quote.status === "ACCEPTED" && (
         <div className="flex gap-2">
-          <button onClick={() => void handleConvert()} disabled={converting} className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50">
+          <button onClick={() => void handleConvert()} disabled={converting} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-2 font-medium disabled:opacity-50">
             {converting ? "Converting…" : "Convert to Invoice"}
           </button>
           <button
@@ -776,11 +786,11 @@ export function QuoteEditor({
               setCancelReason("");
               setShowCancelDialog(true);
             }}
-            className="rounded border border-amber-700 px-4 py-2 font-medium text-amber-400"
+            className="rounded-md border border-amber-300 px-4 py-2 font-medium text-amber-600 transition-colors hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950"
           >
             Cancel Quote
           </button>
-          <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded border border-slate-700 px-4 py-2 font-medium disabled:opacity-50">
+          <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-medium disabled:opacity-50">
             {duplicating ? "Duplicating…" : "Duplicate"}
           </button>
         </div>
@@ -788,7 +798,7 @@ export function QuoteEditor({
 
       {(quote.status === "DECLINED" || isCancelled) && (
         <div className="flex gap-2">
-          <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50">
+          <button onClick={() => void handleDuplicate()} disabled={duplicating} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-2 font-medium disabled:opacity-50">
             {duplicating ? "Duplicating…" : "Duplicate"}
           </button>
         </div>
@@ -843,7 +853,7 @@ export function QuoteEditor({
             <textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               rows={2}
             />
           </label>

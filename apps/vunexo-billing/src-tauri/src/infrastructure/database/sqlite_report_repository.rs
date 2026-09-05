@@ -111,11 +111,26 @@ impl ReportRepository for SqliteReportRepository {
         .fetch_one(&self.pool)
         .await?;
 
+        // A legacy pre-V2 invoice has `tax_regime_snapshot IS NULL` (the
+        // column was added with no backfill — see migration 0002). Grouping
+        // on the raw column would put those rows in their own NULL bucket,
+        // separate from explicit 'IN_GST' rows, even though
+        // `normalize_legacy_snapshot` maps both to the same regime — the
+        // `COALESCE` here folds them into one group *before* `GROUP BY`, so
+        // a range mixing legacy and post-V2 IN_GST invoices reports one
+        // merged row instead of two split ones.
+        // GROUP BY names the `COALESCE(...)` expression again rather than
+        // the output alias: SQLite (like the SQL standard) resolves a GROUP
+        // BY identifier against a real column of the same name before an
+        // alias, so `GROUP BY tax_regime_snapshot` would have silently
+        // grouped on the raw, un-coalesced column — reintroducing the exact
+        // NULL-vs-'IN_GST' split this query exists to fix.
         let rows = sqlx::query(
-            "SELECT tax_regime_snapshot, SUM(tax_amount_minor) AS tax_amount_minor FROM invoices \
+            "SELECT COALESCE(tax_regime_snapshot, 'IN_GST') AS tax_regime_snapshot, \
+                    SUM(tax_amount_minor) AS tax_amount_minor FROM invoices \
              WHERE status != 'CANCELLED' AND issued_at IS NOT NULL \
              AND date(issued_at) >= ? AND date(issued_at) < ? \
-             GROUP BY tax_regime_snapshot",
+             GROUP BY COALESCE(tax_regime_snapshot, 'IN_GST')",
         )
         .bind(range_start)
         .bind(range_end)
@@ -125,9 +140,9 @@ impl ReportRepository for SqliteReportRepository {
         let by_regime = rows
             .iter()
             .map(|row| {
-                let raw: Option<String> = row.get("tax_regime_snapshot");
+                let raw: String = row.get("tax_regime_snapshot");
                 TaxSummaryRow {
-                    tax_regime: normalize_legacy_snapshot(raw.as_deref()),
+                    tax_regime: normalize_legacy_snapshot(Some(&raw)),
                     tax_amount_minor: row.get("tax_amount_minor"),
                 }
             })

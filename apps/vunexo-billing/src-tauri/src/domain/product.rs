@@ -46,7 +46,10 @@ pub struct ProductFields {
 
 /// `application-architecture.md` §3b's `ProductListItem` — `has_invoices`
 /// computed in SQL (`EXISTS` against `invoice_line_items`), never by loading
-/// invoices client-side.
+/// invoices client-side. Also true when a Quote line item (not just an
+/// invoice line item) references this product — `quote_line_items.product_id`
+/// is `ON DELETE RESTRICT` too (migration 0002), so the name is kept for API
+/// stability but the check spans both tables.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ProductListItem {
     #[serde(flatten)]

@@ -1,11 +1,11 @@
 import type { InvoiceStatus, QuoteStatus } from "../lib/tauri/types";
 
 const COLORS: Record<InvoiceStatus, string> = {
-  DRAFT: "text-slate-400",
-  ISSUED: "text-sky-400",
-  PARTIALLY_PAID: "text-amber-400",
-  PAID: "text-emerald-400",
-  CANCELLED: "text-slate-600 line-through",
+  DRAFT: "text-zinc-500 dark:text-zinc-400",
+  ISSUED: "text-blue-600 dark:text-blue-400",
+  PARTIALLY_PAID: "text-amber-600 dark:text-amber-400",
+  PAID: "text-green-600 dark:text-green-400",
+  CANCELLED: "text-zinc-400 line-through dark:text-zinc-600",
 };
 
 /**
@@ -16,8 +16,12 @@ const COLORS: Record<InvoiceStatus, string> = {
 export function StatusBadge({ status, isOverdue }: { status: InvoiceStatus; isOverdue: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className={COLORS[status]}>{status}</span>
-      {isOverdue && <span className="rounded bg-red-950 px-1.5 py-0.5 text-xs text-red-300">OVERDUE</span>}
+      <span className={`text-sm font-medium ${COLORS[status]}`}>{status}</span>
+      {isOverdue && (
+        <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+          OVERDUE
+        </span>
+      )}
     </span>
   );
 }
@@ -27,19 +31,23 @@ export function StatusBadge({ status, isOverdue }: { status: InvoiceStatus; isOv
 // color rather than reusing PAID's green — a converted quote isn't "paid,"
 // it became a different document.
 const QUOTE_COLORS: Record<QuoteStatus, string> = {
-  DRAFT: "text-slate-400",
-  ISSUED: "text-sky-400",
-  ACCEPTED: "text-emerald-400",
-  DECLINED: "text-red-400",
-  CONVERTED: "text-violet-400",
-  CANCELLED: "text-slate-600 line-through",
+  DRAFT: "text-zinc-500 dark:text-zinc-400",
+  ISSUED: "text-blue-600 dark:text-blue-400",
+  ACCEPTED: "text-green-600 dark:text-green-400",
+  DECLINED: "text-red-600 dark:text-red-400",
+  CONVERTED: "text-violet-600 dark:text-violet-400",
+  CANCELLED: "text-zinc-400 line-through dark:text-zinc-600",
 };
 
 export function QuoteStatusBadge({ status, isExpired }: { status: QuoteStatus; isExpired: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className={QUOTE_COLORS[status]}>{status}</span>
-      {isExpired && <span className="rounded bg-amber-950 px-1.5 py-0.5 text-xs text-amber-300">EXPIRED</span>}
+      <span className={`text-sm font-medium ${QUOTE_COLORS[status]}`}>{status}</span>
+      {isExpired && (
+        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+          EXPIRED
+        </span>
+      )}
     </span>
   );
 }

@@ -52,10 +52,10 @@ export function SearchablePicker<T extends PickerItem>({
         }}
         onChange={(e) => setQuery(e.target.value)}
         onBlur={() => setTimeout(() => setIsOpen(false), 150)}
-        className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+        className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
       />
       {isOpen && (
-        <div className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded border border-slate-700 bg-slate-900 shadow-lg">
+        <div className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
           {filtered.map((item) => (
             <button
               key={item.id}
@@ -65,12 +65,12 @@ export function SearchablePicker<T extends PickerItem>({
                 onChange(item.id, item);
                 setIsOpen(false);
               }}
-              className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-800"
+              className="block w-full px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
             >
               {item.label}
             </button>
           ))}
-          {filtered.length === 0 && <p className="px-3 py-2 text-sm text-slate-500">No matches.</p>}
+          {filtered.length === 0 && <p className="px-3 py-2 text-sm text-zinc-500 dark:text-zinc-500">No matches.</p>}
           <button
             type="button"
             onMouseDown={(e) => {
@@ -78,7 +78,7 @@ export function SearchablePicker<T extends PickerItem>({
               onCreateNew();
               setIsOpen(false);
             }}
-            className="block w-full border-t border-slate-800 px-3 py-2 text-left text-sm text-sky-400 hover:bg-slate-800"
+            className="block w-full border-t border-zinc-200 px-3 py-2 text-left text-sm text-blue-600 hover:bg-zinc-100 dark:border-zinc-800 dark:text-blue-400 dark:hover:bg-zinc-800"
           >
             + {createLabel}
           </button>

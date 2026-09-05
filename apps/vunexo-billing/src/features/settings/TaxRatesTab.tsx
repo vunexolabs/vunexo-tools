@@ -19,11 +19,14 @@ function TaxRateRow({ taxRate, onSave }: { taxRate: TaxRate; onSave: (fields: { 
 
   if (!editing) {
     return (
-      <tr className="border-t border-slate-800">
-        <td className="py-2">{taxRate.name}</td>
-        <td className="py-2 text-slate-400">{formatBasisPointsAsPercent(taxRate.rate_basis_points)}%</td>
-        <td className="py-2 text-right">
-          <button onClick={() => setEditing(true)} className="text-sky-400 hover:underline">
+      <tr className="border-t border-zinc-200 dark:border-zinc-800">
+        <td className="px-4 py-2.5">{taxRate.name}</td>
+        <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">{formatBasisPointsAsPercent(taxRate.rate_basis_points)}%</td>
+        <td className="px-4 py-2.5 text-right">
+          <button
+            onClick={() => setEditing(true)}
+            className="rounded-md px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10"
+          >
             Edit
           </button>
         </td>
@@ -45,17 +48,17 @@ function TaxRateRow({ taxRate, onSave }: { taxRate: TaxRate; onSave: (fields: { 
   };
 
   return (
-    <tr className="border-t border-slate-800">
-      <td colSpan={3} className="py-2">
+    <tr className="border-t border-zinc-200 dark:border-zinc-800">
+      <td colSpan={3} className="px-4 py-2.5">
         <ErrorBanner error={error} />
         <div className="flex items-center gap-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm" />
-          <input value={rateStr} onChange={(e) => setRateStr(e.target.value)} className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm" />
-          <span className="text-sm text-slate-500">%</span>
-          <button onClick={() => void submit()} disabled={saving} className="rounded bg-sky-600 px-3 py-1 text-sm disabled:opacity-50">
+          <input value={name} onChange={(e) => setName(e.target.value)} className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
+          <input value={rateStr} onChange={(e) => setRateStr(e.target.value)} className="w-20 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
+          <span className="text-sm text-zinc-400 dark:text-zinc-500">%</span>
+          <button onClick={() => void submit()} disabled={saving} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-3 py-1 text-sm disabled:opacity-50">
             {saving ? "Saving…" : "Save"}
           </button>
-          <button onClick={() => setEditing(false)} className="text-sm text-slate-400 hover:underline">
+          <button onClick={() => setEditing(false)} className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors hover:underline">
             Cancel
           </button>
         </div>
@@ -88,42 +91,44 @@ export function TaxRatesTab() {
   return (
     <div className="max-w-lg space-y-3">
       <ErrorBanner error={error} />
-      <table className="w-full text-left text-sm">
-        <thead className="text-slate-400">
-          <tr>
-            <th className="pb-2">Name</th>
-            <th className="pb-2">Rate</th>
-            <th className="pb-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {taxRates?.map((rate) => (
-            <TaxRateRow key={rate.id} taxRate={rate} onSave={(fields) => update(rate.id, fields).then(() => undefined)} />
-          ))}
-        </tbody>
-      </table>
-      {taxRates && taxRates.length === 0 && <p className="text-sm text-slate-500">No tax rates yet — add one below.</p>}
+      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-400">
+            <tr>
+              <th className="px-4 py-2.5 font-medium">Name</th>
+              <th className="px-4 py-2.5 font-medium">Rate</th>
+              <th className="px-4 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-zinc-900">
+            {taxRates?.map((rate) => (
+              <TaxRateRow key={rate.id} taxRate={rate} onSave={(fields) => update(rate.id, fields).then(() => undefined)} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {taxRates && taxRates.length === 0 && <p className="text-sm text-zinc-400 dark:text-zinc-500">No tax rates yet — add one below.</p>}
 
-      <div className="space-y-2 border-t border-slate-800 pt-3">
+      <div className="space-y-2 border-t border-zinc-200 dark:border-zinc-800 pt-3">
         <ErrorBanner error={createError} />
         <div className="flex items-center gap-2">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. GST 18%"
-            className="flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+            className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
           <input
             value={rateStr}
             onChange={(e) => setRateStr(e.target.value)}
             placeholder="18"
-            className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+            className="w-20 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
-          <span className="text-sm text-slate-500">%</span>
+          <span className="text-sm text-zinc-400 dark:text-zinc-500">%</span>
           <button
             onClick={() => void submitNew()}
             disabled={creating || name.trim() === ""}
-            className="rounded bg-sky-600 px-3 py-1 text-sm font-medium disabled:opacity-50"
+            className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-3 py-1 text-sm font-medium disabled:opacity-50"
           >
             {creating ? "Adding…" : "+ Add"}
           </button>

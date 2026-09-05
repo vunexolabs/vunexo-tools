@@ -126,6 +126,17 @@ export function splitGst(taxAmountMinor: number, isInterstate: boolean): { cgst:
   return { igst: 0, cgst, sgst: taxAmountMinor - cgst };
 }
 
+/**
+ * calculation-engine-v2.md §3 — symmetric with `splitGst`, mirroring
+ * `domain::calculation::present_vat` exactly. `VAT_STANDARD` has no
+ * intrastate/interstate-equivalent split, so this is a near-passthrough kept
+ * as its own named function anyway, so the totals panel has exactly one
+ * dispatch point per regime, matching `splitGst`'s shape.
+ */
+export function presentVat(taxAmountMinor: number): { vatAmountMinor: number } {
+  return { vatAmountMinor: taxAmountMinor };
+}
+
 /** Same integer-string-only approach as parseAmountToMinor, scaled to 3 decimal places (calculation-engine.md §1's quantity_thousandths). */
 export function parseQuantityToThousandths(input: string): number {
   const trimmed = input.trim();

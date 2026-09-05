@@ -156,9 +156,17 @@ impl ProductRepository for SqliteProductRepository {
         } else {
             "WHERE p.status = 'ACTIVE'"
         };
+        // A product referenced only from a Quote's line items (never
+        // invoiced) has no row in `invoice_line_items`, but
+        // `quote_line_items.product_id` is `ON DELETE RESTRICT` (migration
+        // 0002) exactly like `invoice_line_items.product_id` — so this flag,
+        // which the UI uses to decide whether Delete is even offered, must
+        // check both tables or it offers a delete the database will then
+        // refuse.
         let sql = format!(
             "SELECT p.{col}, \
-             EXISTS (SELECT 1 FROM invoice_line_items li WHERE li.product_id = p.id) AS has_invoices \
+             (EXISTS (SELECT 1 FROM invoice_line_items li WHERE li.product_id = p.id) \
+              OR EXISTS (SELECT 1 FROM quote_line_items qli WHERE qli.product_id = p.id)) AS has_invoices \
              FROM products p {where_clause} ORDER BY p.name",
             col = SELECT_COLUMNS.replace(", ", ", p."),
         );

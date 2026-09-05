@@ -4,6 +4,7 @@ import { chooseOpenPath } from "../../lib/tauri/client";
 import { probeBusinessLogo } from "../../lib/tauri/commands";
 import type { LogoProbe } from "../../lib/tauri/types";
 import { useBusiness } from "../../hooks/useBusiness";
+import { useTaxRegimeFields } from "../../hooks/useTaxRegimeFields";
 import type { Business } from "../../lib/tauri/types";
 
 /** ui-ux.md §1/§6 — Settings → Business Profile. Every field but name stays optional past initial setup. */
@@ -11,7 +12,7 @@ export function BusinessProfileTab() {
   const { business, update } = useBusiness();
 
   if (!business) {
-    return <p className="text-sm text-slate-500">Loading…</p>;
+    return <p className="text-sm text-zinc-400 dark:text-zinc-500">Loading…</p>;
   }
 
   return <BusinessProfileForm business={business} onSave={update} />;
@@ -32,6 +33,7 @@ function BusinessProfileForm({
   // invoice — right for a render, but it means a moved or unsupported file
   // shows up only as a logo-less invoice. So say it here, where it's fixable.
   const [logoProbe, setLogoProbe] = useState<LogoProbe | null>(null);
+  const taxFields = useTaxRegimeFields(fields.tax_regime_code);
 
   const logoPath = fields.logo_path;
   useEffect(() => {
@@ -90,23 +92,23 @@ function BusinessProfileForm({
             setSaved(false);
             setFields((f) => ({ ...f, name: e.target.value }));
           }}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         />
       </label>
 
       <label className="block text-sm">
         Address
-        <input value={fields.address ?? ""} onChange={set("address")} className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2" />
+        <input value={fields.address ?? ""} onChange={set("address")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
       </label>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm">
           Phone
-          <input value={fields.phone ?? ""} onChange={set("phone")} className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2" />
+          <input value={fields.phone ?? ""} onChange={set("phone")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
         <label className="block text-sm">
           Email
-          <input value={fields.email ?? ""} onChange={set("email")} className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2" />
+          <input value={fields.email ?? ""} onChange={set("email")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
       </div>
 
@@ -123,7 +125,7 @@ function BusinessProfileForm({
             readOnly
             value={fields.logo_path ?? ""}
             placeholder="No logo chosen"
-            className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-400"
+            className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-500 dark:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
           <button
             type="button"
@@ -135,7 +137,7 @@ function BusinessProfileForm({
               setSaved(false);
               setFields((f) => ({ ...f, logo_path: path }));
             }}
-            className="shrink-0 rounded border border-slate-700 px-3 py-2"
+            className="shrink-0 rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2"
           >
             Choose…
           </button>
@@ -146,44 +148,69 @@ function BusinessProfileForm({
                 setSaved(false);
                 setFields((f) => ({ ...f, logo_path: null }));
               }}
-              className="shrink-0 rounded border border-slate-700 px-3 py-2 text-slate-400"
+              className="shrink-0 rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-500 dark:text-zinc-400"
             >
               Remove
             </button>
           )}
         </div>
         {logoProbe?.status === "OK" && (
-          <p className="mt-1 text-xs text-emerald-400">
+          <p className="mt-1 text-xs text-green-600 dark:text-green-400">
             Ready to print — {logoProbe.width_px} × {logoProbe.height_px} px.
           </p>
         )}
         {logoProbe?.status === "NOT_FOUND" && (
-          <p className="mt-1 text-xs text-amber-400">
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
             That file isn't there any more — it was moved, renamed, or is on a drive that isn't connected. Choose it again.
           </p>
         )}
         {logoProbe?.status === "UNREADABLE" && (
-          <p className="mt-1 text-xs text-amber-400">That file can't be read as an image. PNG and JPEG print correctly.</p>
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">That file can't be read as an image. PNG and JPEG print correctly.</p>
         )}
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
           Invoices already issued keep the logo they were issued with — they're a frozen record. Opening one and pressing
           "Save Changes" re-snapshots it, and every new invoice picks this up automatically.
         </p>
       </div>
 
       <label className="block text-sm">
-        GSTIN
-        <input value={fields.gstin ?? ""} onChange={set("gstin")} className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2" />
+        Tax regime
+        <select
+          value={fields.tax_regime_code}
+          onChange={(e) => {
+            setSaved(false);
+            setFields((f) => ({ ...f, tax_regime_code: e.target.value as Business["tax_regime_code"] }));
+          }}
+          className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="IN_GST">India (GST)</option>
+          <option value="VAT_STANDARD">Standard VAT</option>
+        </select>
       </label>
+      {/* ui-ux-v2.md §3 — a plain confirmation, not a migration wizard: no
+          recalculation preview, no per-draft opt-in, no affected-count. */}
+      {fields.tax_regime_code !== business.tax_regime_code && (
+        <p className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="font-medium text-zinc-900 dark:text-zinc-100">Tax regime changed.</span> Existing issued documents won&apos;t be
+          affected. Any Draft documents will use the new regime the next time you save them.
+        </p>
+      )}
+
+      {taxFields.has("gstin") && (
+        <label className="block text-sm">
+          GSTIN
+          <input value={fields.gstin ?? ""} onChange={set("gstin")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
+        </label>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm">
           Bank details
-          <input value={fields.bank_details ?? ""} onChange={set("bank_details")} className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2" />
+          <input value={fields.bank_details ?? ""} onChange={set("bank_details")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
         <label className="block text-sm">
           UPI ID
-          <input value={fields.upi_id ?? ""} onChange={set("upi_id")} className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2" />
+          <input value={fields.upi_id ?? ""} onChange={set("upi_id")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
       </div>
 
@@ -191,11 +218,11 @@ function BusinessProfileForm({
         <button
           type="submit"
           disabled={saving || fields.name.trim() === ""}
-          className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50"
+          className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-2 font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>
-        {saved && <span className="text-sm text-emerald-400">Saved.</span>}
+        {saved && <span className="text-sm text-green-600 dark:text-green-400">Saved.</span>}
       </div>
     </form>
   );

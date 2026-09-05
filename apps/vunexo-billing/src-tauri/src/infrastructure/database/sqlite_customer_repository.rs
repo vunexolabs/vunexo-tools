@@ -144,9 +144,16 @@ impl CustomerRepository for SqliteCustomerRepository {
         } else {
             "WHERE c.status = 'ACTIVE'"
         };
+        // A customer referenced only by a Quote (never invoiced) has no row
+        // in `invoices`, but `quotes.customer_id` is `ON DELETE RESTRICT`
+        // (migration 0002) exactly like `invoices.customer_id` — so this
+        // flag, which the UI uses to decide whether Delete is even offered,
+        // must check both tables or it offers a delete the database will
+        // then refuse.
         let sql = format!(
             "SELECT c.{col}, \
-             EXISTS (SELECT 1 FROM invoices i WHERE i.customer_id = c.id) AS has_invoices \
+             (EXISTS (SELECT 1 FROM invoices i WHERE i.customer_id = c.id) \
+              OR EXISTS (SELECT 1 FROM quotes q WHERE q.customer_id = c.id)) AS has_invoices \
              FROM customers c {where_clause} ORDER BY c.name",
             col = SELECT_COLUMNS.replace(", ", ", c."),
         );

@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <title>Vunexo Billing</title>
+    <script>
+      // Applied synchronously, before first paint, so there's no flash of
+      // the wrong theme while React hydrates — `useTheme` reconciles with
+      // this same logic once mounted (kept in sync manually; see that file).
+      (function () {
+        try {
+          var stored = localStorage.getItem("vunexo-theme");
+          var dark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.classList.toggle("dark", dark);
+        } catch (e) {
+          // Storage/matchMedia unavailable — default to light, same as useTheme's fallback.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

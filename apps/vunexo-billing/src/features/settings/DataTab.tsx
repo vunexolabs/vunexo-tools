@@ -87,26 +87,26 @@ export function DataTab() {
   return (
     <div className="max-w-2xl space-y-8">
       <ErrorBanner error={error} />
-      {done && <p className="text-sm text-emerald-400">{done}</p>}
+      {done && <p className="text-sm text-green-600 dark:text-green-400">{done}</p>}
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-200">Backup &amp; restore</h2>
-        <p className="text-sm text-slate-500">
-          A backup is a single <code className="text-slate-400">.vbx</code> file holding your database and your logo. Keep it
+        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Backup &amp; restore</h2>
+        <p className="text-sm text-zinc-400 dark:text-zinc-500">
+          A backup is a single <code className="text-zinc-500 dark:text-zinc-400">.vbx</code> file holding your database and your logo. Keep it
           somewhere other than this computer — it's the only copy of your data that isn't on this machine.
         </p>
         <div className="flex gap-2 pt-1">
           <button
             onClick={() => void handleBackup()}
             disabled={busy !== null}
-            className="rounded bg-sky-600 px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             {busy === "backup" ? "Backing up…" : "Back Up Now"}
           </button>
           <button
             onClick={() => void handleChooseRestore()}
             disabled={busy !== null}
-            className="rounded border border-amber-700 px-4 py-2 text-sm font-medium text-amber-400 disabled:opacity-50"
+            className="rounded-md border border-amber-300 px-4 py-2 text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950"
           >
             {busy === "restore" ? "Reading…" : "Restore from Backup…"}
           </button>
@@ -114,8 +114,8 @@ export function DataTab() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-200">Export</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Export</h2>
+        <p className="text-sm text-zinc-400 dark:text-zinc-500">
           Exports are read-only — nothing in your data changes. Amounts are written as plain numbers so a spreadsheet reads them
           as numbers.
         </p>
@@ -125,7 +125,7 @@ export function DataTab() {
               key={entity}
               onClick={() => void handleExport(entity, label)}
               disabled={busy !== null}
-              className="rounded border border-slate-700 px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {busy === entity ? "Exporting…" : label}
             </button>
@@ -133,7 +133,7 @@ export function DataTab() {
           <button
             onClick={() => void handleExport("ALL", "Export All Data (JSON)")}
             disabled={busy !== null}
-            className="rounded border border-slate-700 px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             {busy === "ALL" ? "Exporting…" : "Export All Data (JSON)"}
           </button>

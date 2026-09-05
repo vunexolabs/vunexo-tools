@@ -54,28 +54,28 @@ export function ReminderModal({ invoiceId, invoiceNumber, onClose }: { invoiceId
           }
         }
       `}</style>
-      <div id="reminder-print-portal" className="w-full max-w-lg space-y-3 rounded border border-slate-700 bg-slate-900 p-4">
+      <div id="reminder-print-portal" className="w-full max-w-lg space-y-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
         <h2 className="text-base font-semibold">Payment Reminder{invoiceNumber ? ` — ${invoiceNumber}` : ""}</h2>
         <ErrorBanner error={error} />
         {loading ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-zinc-400 dark:text-zinc-500">Loading…</p>
         ) : (
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={12}
-            className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         )}
         <pre className="reminder-print-only">{message}</pre>
         <div className="flex flex-wrap gap-2 pt-2">
-          <button onClick={() => void handleCopy()} disabled={loading} className="rounded bg-sky-600 px-4 py-2 text-sm font-medium disabled:opacity-50">
+          <button onClick={() => void handleCopy()} disabled={loading} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-2 text-sm font-medium disabled:opacity-50">
             {copied ? "Copied!" : "Copy to Clipboard"}
           </button>
-          <button onClick={() => window.print()} disabled={loading} className="rounded border border-slate-700 px-4 py-2 text-sm disabled:opacity-50">
+          <button onClick={() => window.print()} disabled={loading} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm disabled:opacity-50">
             Print / Save PDF
           </button>
-          <button onClick={onClose} className="rounded border border-slate-700 px-4 py-2 text-sm">
+          <button onClick={onClose} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">
             Close
           </button>
         </div>

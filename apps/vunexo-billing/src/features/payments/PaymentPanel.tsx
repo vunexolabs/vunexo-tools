@@ -45,16 +45,16 @@ function PaymentRow({
 
   if (!editing) {
     return (
-      <tr className="border-t border-slate-800">
+      <tr className="border-t border-zinc-200 dark:border-zinc-800">
         <td className="py-2">{payment.paid_on}</td>
         <td className="py-2">{symbol}{formatMinor(payment.amount_minor)}</td>
-        <td className="py-2 text-slate-400">{METHOD_LABELS[payment.method]}</td>
-        <td className="py-2 text-slate-400">{payment.reference || "—"}</td>
+        <td className="py-2 text-zinc-500 dark:text-zinc-400">{METHOD_LABELS[payment.method]}</td>
+        <td className="py-2 text-zinc-500 dark:text-zinc-400">{payment.reference || "—"}</td>
         <td className="py-2 text-right">
-          <button onClick={() => setEditing(true)} className="mr-3 text-sky-400 hover:underline">
+          <button onClick={() => setEditing(true)} className="mr-3 text-blue-600 dark:text-blue-400 transition-colors hover:underline">
             Edit
           </button>
-          <button onClick={() => void onDelete()} className="text-red-400 hover:underline">
+          <button onClick={() => void onDelete()} className="text-red-600 dark:text-red-400 transition-colors hover:underline">
             Delete
           </button>
         </td>
@@ -81,7 +81,7 @@ function PaymentRow({
   };
 
   return (
-    <tr className="border-t border-slate-800">
+    <tr className="border-t border-zinc-200 dark:border-zinc-800">
       <td colSpan={5} className="py-2">
         <ErrorBanner error={error} />
         <div className="flex flex-wrap items-center gap-2">
@@ -89,18 +89,18 @@ function PaymentRow({
             type="date"
             value={paidOn}
             onChange={(e) => setPaidOn(e.target.value)}
-            className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+            className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
           <input
             value={amountStr}
             onChange={(e) => setAmountStr(e.target.value)}
             placeholder={`Amount ${symbol}`}
-            className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+            className="w-24 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
           <select
             value={method}
             onChange={(e) => setMethod(e.target.value as PaymentMethod)}
-            className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+            className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           >
             {Object.entries(METHOD_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -112,12 +112,12 @@ function PaymentRow({
             value={reference}
             onChange={(e) => setReference(e.target.value)}
             placeholder="Reference (optional)"
-            className="flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+            className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
-          <button onClick={() => void submit()} disabled={saving} className="rounded bg-sky-600 px-3 py-1 text-sm disabled:opacity-50">
+          <button onClick={() => void submit()} disabled={saving} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-3 py-1 text-sm disabled:opacity-50">
             {saving ? "Saving…" : "Save"}
           </button>
-          <button onClick={() => setEditing(false)} className="text-sm text-slate-400 hover:underline">
+          <button onClick={() => setEditing(false)} className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors hover:underline">
             Cancel
           </button>
         </div>
@@ -175,13 +175,13 @@ export function PaymentPanel({
   };
 
   return (
-    <div className="space-y-3 rounded border border-slate-700 bg-slate-900 p-4">
+    <div className="space-y-3 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">Payments</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Paid {symbol}{formatMinor(amountPaidMinor)} of {symbol}{formatMinor(totalMinor)}
           {remainingMinor > 0 && <> · {symbol}{formatMinor(remainingMinor)} remaining</>}
-          {remainingMinor < 0 && <span className="text-amber-400"> · overpaid by {symbol}{formatMinor(-remainingMinor)}</span>}
+          {remainingMinor < 0 && <span className="text-amber-600 dark:text-amber-400"> · overpaid by {symbol}{formatMinor(-remainingMinor)}</span>}
         </p>
       </div>
 
@@ -189,7 +189,7 @@ export function PaymentPanel({
 
       {payments && payments.length > 0 && (
         <table className="w-full text-left text-sm">
-          <thead className="text-slate-400">
+          <thead className="text-zinc-500 dark:text-zinc-400">
             <tr>
               <th className="pb-1">Date</th>
               <th className="pb-1">Amount</th>
@@ -216,28 +216,28 @@ export function PaymentPanel({
           </tbody>
         </table>
       )}
-      {payments && payments.length === 0 && <p className="text-sm text-slate-500">No payments recorded yet.</p>}
+      {payments && payments.length === 0 && <p className="text-sm text-zinc-400 dark:text-zinc-500">No payments recorded yet.</p>}
 
       {canRecordNew && (
-        <div className="space-y-2 border-t border-slate-800 pt-3">
+        <div className="space-y-2 border-t border-zinc-200 dark:border-zinc-800 pt-3">
           <ErrorBanner error={recordError} />
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="date"
               value={paidOn}
               onChange={(e) => setPaidOn(e.target.value)}
-              className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+              className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
             <input
               value={amountStr}
               onChange={(e) => setAmountStr(e.target.value)}
               placeholder={`Amount ${symbol} (default ${formatMinor(Math.max(remainingMinor, 0))})`}
-              className="w-40 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+              className="w-40 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
             <select
               value={method}
               onChange={(e) => setMethod(e.target.value as PaymentMethod)}
-              className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+              className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             >
               {Object.entries(METHOD_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -249,18 +249,18 @@ export function PaymentPanel({
               value={reference}
               onChange={(e) => setReference(e.target.value)}
               placeholder="Reference (optional)"
-              className="flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+              className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
             <button
               onClick={() => void submitNew()}
               disabled={recording}
-              className="rounded bg-sky-600 px-3 py-1 text-sm font-medium disabled:opacity-50"
+              className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-3 py-1 text-sm font-medium disabled:opacity-50"
             >
               {recording ? "Recording…" : "Record Payment"}
             </button>
           </div>
           {isOverpaying && (
-            <p className="text-xs text-amber-400">
+            <p className="text-xs text-amber-600 dark:text-amber-400">
               This is more than the remaining balance — it will be recorded in full and flagged as an overpayment, not clamped.
             </p>
           )}

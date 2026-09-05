@@ -1,7 +1,9 @@
 import { FormEvent, useState } from "react";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { useBusiness } from "../../hooks/useBusiness";
 import { useCurrency } from "../../hooks/useCurrency";
 import { useTaxRates } from "../../hooks/useTaxRates";
+import { useTaxRegimeFields } from "../../hooks/useTaxRegimeFields";
 import type { Product, ProductFields } from "../../lib/tauri/types";
 
 const EMPTY: ProductFields = {
@@ -42,6 +44,8 @@ export function ProductForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const { taxRates } = useTaxRates();
+  const { business } = useBusiness();
+  const taxFields = useTaxRegimeFields(business?.tax_regime_code ?? "IN_GST");
 
   const set = (key: "sku" | "description" | "hsn_sac_code") => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFields((f) => ({ ...f, [key]: e.target.value || null }));
@@ -59,7 +63,7 @@ export function ProductForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded border border-slate-700 bg-slate-900 p-4">
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
       <ErrorBanner error={error} />
       <label className="block text-sm">
         Name *
@@ -67,17 +71,17 @@ export function ProductForm({
           required
           value={fields.name}
           onChange={(e) => setFields((f) => ({ ...f, name: e.target.value }))}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm">
-          Unit * <span className="text-slate-500">(pcs, hr, kg…)</span>
+          Unit * <span className="text-zinc-400 dark:text-zinc-500">(pcs, hr, kg…)</span>
           <input
             required
             value={fields.unit}
             onChange={(e) => setFields((f) => ({ ...f, unit: e.target.value }))}
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </label>
         <label className="block text-sm">
@@ -87,28 +91,30 @@ export function ProductForm({
             inputMode="decimal"
             value={priceInput}
             onChange={(e) => setPriceInput(e.target.value)}
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </label>
       </div>
       <label className="block text-sm">
         SKU
-        <input defaultValue={fields.sku ?? ""} onChange={set("sku")} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2" />
+        <input defaultValue={fields.sku ?? ""} onChange={set("sku")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
       </label>
       <label className="block text-sm">
         Description
-        <input defaultValue={fields.description ?? ""} onChange={set("description")} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2" />
+        <input defaultValue={fields.description ?? ""} onChange={set("description")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
       </label>
-      <label className="block text-sm">
-        HSN/SAC code
-        <input defaultValue={fields.hsn_sac_code ?? ""} onChange={set("hsn_sac_code")} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2" />
-      </label>
+      {taxFields.has("hsn_sac") && (
+        <label className="block text-sm">
+          HSN/SAC code
+          <input defaultValue={fields.hsn_sac_code ?? ""} onChange={set("hsn_sac_code")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
+        </label>
+      )}
       <label className="block text-sm">
         Tax rate
         <select
           value={fields.tax_rate_id ?? ""}
           onChange={(e) => setFields((f) => ({ ...f, tax_rate_id: e.target.value ? Number(e.target.value) : null }))}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">None</option>
           {taxRates?.map((rate) => (
@@ -122,11 +128,11 @@ export function ProductForm({
         <button
           type="submit"
           disabled={submitting || fields.name.trim() === "" || fields.unit.trim() === ""}
-          className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50"
+          className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-2 font-medium disabled:opacity-50"
         >
           {submitting ? "Saving…" : "Save"}
         </button>
-        <button type="button" onClick={onCancel} className="rounded border border-slate-700 px-4 py-2">
+        <button type="button" onClick={onCancel} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2">
           Cancel
         </button>
       </div>

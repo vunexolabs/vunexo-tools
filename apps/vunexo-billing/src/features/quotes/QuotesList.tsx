@@ -75,7 +75,7 @@ export function QuotesList({ onOpen }: { onOpen: (id: number) => void }) {
         <button
           onClick={handleNewQuote}
           disabled={creating}
-          className="rounded bg-sky-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
         >
           {creating ? "Creating…" : "+ New Quote"}
         </button>
@@ -86,7 +86,7 @@ export function QuotesList({ onOpen }: { onOpen: (id: number) => void }) {
           <button
             key={f.label}
             onClick={() => setFilter(f.value)}
-            className={`rounded px-2 py-1 ${filter === f.value ? "bg-slate-800" : "text-slate-400 hover:bg-slate-900"}`}
+            className={`rounded-md px-2 py-1 transition-colors ${filter === f.value ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}
           >
             {f.label}
           </button>
@@ -96,74 +96,79 @@ export function QuotesList({ onOpen }: { onOpen: (id: number) => void }) {
       <ErrorBanner error={error} />
       <ErrorBanner error={rowError} />
 
-      <table className="w-full text-left text-sm">
-        <thead className="text-slate-400">
-          <tr>
-            <th className="pb-2">Number</th>
-            <th className="pb-2">Customer</th>
-            <th className="pb-2">Date</th>
-            <th className="pb-2">Total</th>
-            <th className="pb-2">Status</th>
-            <th className="pb-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {quotes?.map((q) => (
-            <tr key={q.id} className="border-t border-slate-800">
-              <td className="py-2">
-                <button onClick={() => onOpen(q.id)} className="text-sky-400 hover:underline">
-                  {q.quote_number ?? `Draft #${q.id}`}
-                </button>
-              </td>
-              <td className="py-2 text-slate-400">{q.customer_name ?? "—"}</td>
-              <td className="py-2 text-slate-400">{q.quote_date}</td>
-              <td className="py-2 text-slate-400">
-                {symbol}
-                {formatMinor(q.total_minor)}
-              </td>
-              <td className="py-2">
-                <QuoteStatusBadge status={q.status} isExpired={q.is_expired} />
-              </td>
-              <td className="py-2 text-right">
-                <div className="flex justify-end gap-2">
-                  {q.status === "DRAFT" && (
-                    <button onClick={() => setDeleteTargetId(q.id)} className="text-red-400 hover:underline">
-                      Delete
-                    </button>
-                  )}
-                  {(q.status === "ISSUED" || q.status === "ACCEPTED") && (
-                    <button
-                      onClick={() => {
-                        setCancelReason("");
-                        setCancelTargetId(q.id);
-                      }}
-                      className="text-amber-400 hover:underline"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                  {q.status !== "DRAFT" && (
-                    <button
-                      onClick={() =>
-                        runRowAction(async () => {
-                          const d = await duplicate(q.id);
-                          onOpen(d.id);
-                        })
-                      }
-                      className="text-sky-400 hover:underline"
-                    >
-                      Duplicate
-                    </button>
-                  )}
-                </div>
-              </td>
+      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-400">
+            <tr>
+              <th className="px-4 py-2.5 font-medium">Number</th>
+              <th className="px-4 py-2.5 font-medium">Customer</th>
+              <th className="px-4 py-2.5 font-medium">Date</th>
+              <th className="px-4 py-2.5 font-medium">Total</th>
+              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="bg-white dark:bg-zinc-900">
+            {quotes?.map((q) => (
+              <tr key={q.id} className="border-t border-zinc-200 dark:border-zinc-800">
+                <td className="px-4 py-2.5">
+                  <button onClick={() => onOpen(q.id)} className="text-blue-600 dark:text-blue-400 transition-colors hover:underline">
+                    {q.quote_number ?? `Draft #${q.id}`}
+                  </button>
+                </td>
+                <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">{q.customer_name ?? "—"}</td>
+                <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">{q.quote_date}</td>
+                <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">
+                  {symbol}
+                  {formatMinor(q.total_minor)}
+                </td>
+                <td className="px-4 py-2.5">
+                  <QuoteStatusBadge status={q.status} isExpired={q.is_expired} />
+                </td>
+                <td className="px-4 py-2.5 text-right">
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {q.status === "DRAFT" && (
+                      <button
+                        onClick={() => setDeleteTargetId(q.id)}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                      >
+                        Delete
+                      </button>
+                    )}
+                    {(q.status === "ISSUED" || q.status === "ACCEPTED") && (
+                      <button
+                        onClick={() => {
+                          setCancelReason("");
+                          setCancelTargetId(q.id);
+                        }}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    {q.status !== "DRAFT" && (
+                      <button
+                        onClick={() =>
+                          runRowAction(async () => {
+                            const d = await duplicate(q.id);
+                            onOpen(d.id);
+                          })
+                        }
+                        className="rounded-md px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                      >
+                        Duplicate
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {quotes !== null && quotes.length === 0 && (
-        <p className="text-sm text-slate-500">No quotes yet — click "+ New Quote" to create one.</p>
+        <p className="text-sm text-zinc-400 dark:text-zinc-500">No quotes yet — click "+ New Quote" to create one.</p>
       )}
 
       {deleteTargetId !== null && (
@@ -197,7 +202,7 @@ export function QuotesList({ onOpen }: { onOpen: (id: number) => void }) {
             <textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               rows={2}
             />
           </label>

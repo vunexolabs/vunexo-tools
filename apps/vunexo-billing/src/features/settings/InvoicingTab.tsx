@@ -30,7 +30,7 @@ export function InvoicingTab() {
     return (
       <>
         <ErrorBanner error={error} />
-        {!error && <p className="text-sm text-slate-500">Loading…</p>}
+        {!error && <p className="text-sm text-zinc-400 dark:text-zinc-500">Loading…</p>}
       </>
     );
   }
@@ -63,9 +63,9 @@ export function InvoicingTab() {
             setSaved(false);
             setFields((f) => f && { ...f, invoice_number_format: e.target.value });
           }}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         />
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-zinc-400 dark:text-zinc-500">
           Supports {"{year}"} and {"{seq}"}/{"{seq:04d}"} — locked once the first invoice has been issued.
         </span>
       </label>
@@ -80,7 +80,7 @@ export function InvoicingTab() {
             setSaved(false);
             setFields((f) => f && { ...f, default_due_days: Number(e.target.value) });
           }}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         />
       </label>
 
@@ -92,7 +92,7 @@ export function InvoicingTab() {
             setSaved(false);
             setFields((f) => f && { ...f, default_tax_rate_id: e.target.value ? Number(e.target.value) : null });
           }}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">None</option>
           {taxRates?.map((rate) => (
@@ -113,7 +113,7 @@ export function InvoicingTab() {
               const country = COUNTRIES.find((c) => c.code === e.target.value);
               setFields((f) => f && { ...f, country_code: e.target.value, currency_code: country?.currencyCode ?? f.currency_code });
             }}
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           >
             {!COUNTRIES.some((c) => c.code === fields.country_code) && (
               <option value={fields.country_code}>{fields.country_code}</option>
@@ -133,7 +133,7 @@ export function InvoicingTab() {
               setSaved(false);
               setFields((f) => f && { ...f, currency_code: e.target.value });
             }}
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           >
             {!(fields.currency_code in CURRENCIES) && <option value={fields.currency_code}>{fields.currency_code}</option>}
             {Object.entries(CURRENCIES).map(([code, meta]) => (
@@ -144,9 +144,10 @@ export function InvoicingTab() {
           </select>
         </label>
       </div>
-      <p className="text-xs text-slate-500">
-        Only India's GST (CGST/SGST/IGST) tax model is implemented today — other countries' tax rules are on the roadmap. Currency
-        symbol and decimal formatting apply everywhere immediately; set the tax rates under the Tax Rates tab to match your region.
+      <p className="text-xs text-zinc-400 dark:text-zinc-500">
+        Two tax models are implemented: India's GST (CGST/SGST/IGST) and a standard flat-rate VAT — set which one applies under
+        Business Profile → Tax regime, independent of the country/currency chosen here. Currency symbol and decimal formatting
+        apply everywhere immediately; set the tax rates under the Tax Rates tab to match your region.
       </p>
 
       <label className="block text-sm">
@@ -157,15 +158,15 @@ export function InvoicingTab() {
             setSaved(false);
             setFields((f) => f && { ...f, date_format: e.target.value });
           }}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         />
       </label>
 
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={saving} className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50">
+        <button type="submit" disabled={saving} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-2 font-medium disabled:opacity-50">
           {saving ? "Saving…" : "Save"}
         </button>
-        {saved && <span className="text-sm text-emerald-400">Saved.</span>}
+        {saved && <span className="text-sm text-green-600 dark:text-green-400">Saved.</span>}
       </div>
     </form>
   );

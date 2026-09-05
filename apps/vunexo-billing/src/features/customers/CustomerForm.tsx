@@ -1,5 +1,7 @@
 import { FormEvent, useState } from "react";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { useBusiness } from "../../hooks/useBusiness";
+import { useTaxRegimeFields } from "../../hooks/useTaxRegimeFields";
 import type { Customer, CustomerFields } from "../../lib/tauri/types";
 
 const EMPTY: CustomerFields = { name: "", phone: null, email: null, address: null, gstin: null };
@@ -25,6 +27,8 @@ export function CustomerForm({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const { business } = useBusiness();
+  const taxFields = useTaxRegimeFields(business?.tax_regime_code ?? "IN_GST");
 
   const set = (key: keyof CustomerFields) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFields((f) => ({ ...f, [key]: e.target.value || null }));
@@ -42,7 +46,7 @@ export function CustomerForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded border border-slate-700 bg-slate-900 p-4">
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
       <ErrorBanner error={error} />
       <label className="block text-sm">
         Name *
@@ -50,32 +54,34 @@ export function CustomerForm({
           required
           value={fields.name}
           onChange={(e) => setFields((f) => ({ ...f, name: e.target.value }))}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm">
           Phone
-          <input defaultValue={fields.phone ?? ""} onChange={set("phone")} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2" />
+          <input defaultValue={fields.phone ?? ""} onChange={set("phone")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
         <label className="block text-sm">
           Email
-          <input defaultValue={fields.email ?? ""} onChange={set("email")} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2" />
+          <input defaultValue={fields.email ?? ""} onChange={set("email")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
         </label>
       </div>
       <label className="block text-sm">
         Address
-        <input defaultValue={fields.address ?? ""} onChange={set("address")} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2" />
+        <input defaultValue={fields.address ?? ""} onChange={set("address")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
       </label>
-      <label className="block text-sm">
-        GSTIN
-        <input defaultValue={fields.gstin ?? ""} onChange={set("gstin")} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2" />
-      </label>
+      {taxFields.has("gstin") && (
+        <label className="block text-sm">
+          GSTIN
+          <input defaultValue={fields.gstin ?? ""} onChange={set("gstin")} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
+        </label>
+      )}
       <div className="flex gap-2">
-        <button type="submit" disabled={submitting || fields.name.trim() === ""} className="rounded bg-sky-600 px-4 py-2 font-medium disabled:opacity-50">
+        <button type="submit" disabled={submitting || fields.name.trim() === ""} className="rounded-md bg-blue-600 transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-zinc-900 px-4 py-2 font-medium disabled:opacity-50">
           {submitting ? "Saving…" : "Save"}
         </button>
-        <button type="button" onClick={onCancel} className="rounded border border-slate-700 px-4 py-2">
+        <button type="button" onClick={onCancel} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2">
           Cancel
         </button>
       </div>
