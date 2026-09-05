@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { PlusIcon } from "./icons";
 
 interface PickerItem {
   id: number;
@@ -51,10 +52,10 @@ export function SearchablePicker<T extends PickerItem>({
         }}
         onChange={(e) => setQuery(e.target.value)}
         onBlur={() => setTimeout(() => setIsOpen(false), 150)}
-        className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+        className="input"
       />
       {isOpen && (
-        <div className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded border border-slate-700 bg-slate-900 shadow-lg">
+        <div className="card absolute z-10 mt-1 max-h-56 w-full overflow-auto shadow-sm">
           {filtered.map((item) => (
             <button
               key={item.id}
@@ -64,12 +65,12 @@ export function SearchablePicker<T extends PickerItem>({
                 onChange(item.id, item);
                 setIsOpen(false);
               }}
-              className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-800"
+              className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-hover"
             >
               {item.label}
             </button>
           ))}
-          {filtered.length === 0 && <p className="px-3 py-2 text-sm text-slate-500">No matches.</p>}
+          {filtered.length === 0 && <p className="px-3 py-2 text-sm text-text-muted">No matches.</p>}
           <button
             type="button"
             onMouseDown={(e) => {
@@ -77,9 +78,10 @@ export function SearchablePicker<T extends PickerItem>({
               onCreateNew();
               setIsOpen(false);
             }}
-            className="block w-full border-t border-slate-800 px-3 py-2 text-left text-sm text-sky-400 hover:bg-slate-800"
+            className="flex w-full items-center gap-1.5 border-t border-border px-3 py-2 text-left text-sm text-accent hover:bg-surface-hover"
           >
-            + {createLabel}
+            <PlusIcon className="h-3.5 w-3.5" />
+            {createLabel}
           </button>
         </div>
       )}

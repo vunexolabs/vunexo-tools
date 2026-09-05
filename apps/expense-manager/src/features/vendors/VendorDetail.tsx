@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronLeftIcon, PencilIcon } from "../../components/icons";
 import { useVendors } from "../../hooks/useVendors";
 import { VendorForm } from "./VendorForm";
 
@@ -15,8 +16,9 @@ export function VendorDetail({ vendorId, onBack }: { vendorId: number; onBack: (
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="text-sm text-slate-400 hover:underline">
-        ← Back to Vendors
+      <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary">
+        <ChevronLeftIcon className="h-4 w-4" />
+        Back to Vendors
       </button>
 
       {vendor && (
@@ -33,14 +35,12 @@ export function VendorDetail({ vendorId, onBack }: { vendorId: number; onBack: (
               }}
             />
           ) : (
-            <div className="max-w-md space-y-2 text-sm">
+            <div className="card max-w-md space-y-1 p-5">
               <Field label="Contact" value={vendor.contact} />
               <Field label="Notes" value={vendor.notes} />
               <Field label="Has expenses" value={vendor.has_expenses ? "Yes" : "No"} />
-              <button
-                onClick={() => setEditing(true)}
-                className="mt-2 rounded border border-slate-700 px-4 py-2 text-sm font-medium"
-              >
+              <button onClick={() => setEditing(true)} className="btn-secondary btn-sm mt-3">
+                <PencilIcon className="h-3.5 w-3.5" />
                 Edit
               </button>
             </div>
@@ -53,8 +53,8 @@ export function VendorDetail({ vendorId, onBack }: { vendorId: number; onBack: (
 
 function Field({ label, value }: { label: string; value: string | null }) {
   return (
-    <div className="flex justify-between border-b border-slate-800 py-1">
-      <span className="text-slate-400">{label}</span>
+    <div className="flex justify-between border-b border-border py-2 text-sm last:border-0">
+      <span className="text-text-secondary">{label}</span>
       <span>{value ?? "—"}</span>
     </div>
   );

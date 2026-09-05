@@ -57,38 +57,34 @@ export function DataTab() {
     });
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-2xl space-y-6">
       <ErrorBanner error={error} />
-      {done && <p className="text-sm text-emerald-400">{done}</p>}
+      {done && <p className="text-sm text-success">{done}</p>}
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-200">Backup &amp; restore</h2>
-        <p className="text-sm text-slate-500">
-          A backup is a single <code className="text-slate-400">.vex</code> file holding your database and every receipt
+      <section className="card space-y-3 p-5">
+        <h2 className="text-sm font-semibold">Backup &amp; restore</h2>
+        <p className="text-sm text-text-secondary">
+          A backup is a single <code className="text-text-primary">.vex</code> file holding your database and every receipt
           image you've attached. Keep it somewhere other than this computer — it's the only copy of your data that isn't on
           this machine.
         </p>
         <div className="flex gap-2 pt-1">
-          <button
-            onClick={() => void handleBackup()}
-            disabled={busy !== null}
-            className="rounded bg-emerald-600 px-4 py-2 text-sm font-medium disabled:opacity-50"
-          >
+          <button onClick={() => void handleBackup()} disabled={busy !== null} className="btn-primary">
             {busy === "backup" ? "Backing up…" : "Back Up Now"}
           </button>
           <button
             onClick={() => void handleChooseRestore()}
             disabled={busy !== null}
-            className="rounded border border-amber-700 px-4 py-2 text-sm font-medium text-amber-400 disabled:opacity-50"
+            className="btn border border-warning/40 text-warning hover:bg-warning/10"
           >
             {busy === "restore" ? "Reading…" : "Restore from Backup…"}
           </button>
         </div>
       </section>
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-200">Export</h2>
-        <p className="text-sm text-slate-500">
+      <section className="card space-y-2 p-5">
+        <h2 className="text-sm font-semibold">Export</h2>
+        <p className="text-sm text-text-secondary">
           Export a report as CSV from the Reports screen — each report kind exports its own result, read-only, with amounts
           written as plain numbers.
         </p>

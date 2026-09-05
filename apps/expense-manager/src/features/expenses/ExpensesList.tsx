@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { PencilIcon, PlusIcon, TrashIcon } from "../../components/icons";
 import { useCategories } from "../../hooks/useCategories";
 import { useCurrency } from "../../hooks/useCurrency";
 import { useExpenses } from "../../hooks/useExpenses";
@@ -32,20 +33,21 @@ export function ExpensesList({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <h1 className="text-xl font-semibold">Expenses</h1>
-        <button onClick={onNew} className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium">
-          + New Expense
+        <button onClick={onNew} className="btn-primary">
+          <PlusIcon className="h-4 w-4" />
+          New Expense
         </button>
       </div>
 
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label className="flex flex-col gap-1">
-          Category
+          <span className="text-text-secondary">Category</span>
           <select
             value={filter.category_id ?? ""}
             onChange={(e) => setFilter((f) => ({ ...f, category_id: e.target.value ? Number(e.target.value) : null }))}
-            className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
+            className="select"
           >
             <option value="">All</option>
             {categories?.map((c) => (
@@ -56,11 +58,11 @@ export function ExpensesList({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          Vendor
+          <span className="text-text-secondary">Vendor</span>
           <select
             value={filter.vendor_id ?? ""}
             onChange={(e) => setFilter((f) => ({ ...f, vendor_id: e.target.value ? Number(e.target.value) : null }))}
-            className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
+            className="select"
           >
             <option value="">All</option>
             {vendors?.map((v) => (
@@ -71,25 +73,25 @@ export function ExpensesList({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          From
+          <span className="text-text-secondary">From</span>
           <input
             type="date"
             value={filter.date_from ?? ""}
             onChange={(e) => setFilter((f) => ({ ...f, date_from: e.target.value || null }))}
-            className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
+            className="input"
           />
         </label>
         <label className="flex flex-col gap-1">
-          To
+          <span className="text-text-secondary">To</span>
           <input
             type="date"
             value={filter.date_to ?? ""}
             onChange={(e) => setFilter((f) => ({ ...f, date_to: e.target.value || null }))}
-            className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
+            className="input"
           />
         </label>
         {(filter.category_id || filter.vendor_id || filter.date_from || filter.date_to) && (
-          <button onClick={() => setFilter({})} className="text-sm text-slate-400 hover:underline">
+          <button onClick={() => setFilter({})} className="btn-ghost btn-sm">
             Clear filters
           </button>
         )}
@@ -98,46 +100,55 @@ export function ExpensesList({
       <ErrorBanner error={error} />
       <ErrorBanner error={rowError} />
 
-      <table className="w-full text-left text-sm">
-        <thead className="text-slate-400">
-          <tr>
-            <th className="pb-2">Date</th>
-            <th className="pb-2">Vendor</th>
-            <th className="pb-2">Category</th>
-            <th className="pb-2">Amount</th>
-            <th className="pb-2">Deductible</th>
-            <th className="pb-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {expenses?.map((e) => (
-            <tr key={e.id} className="border-t border-slate-800">
-              <td className="py-2">{e.date}</td>
-              <td className="py-2 text-slate-400">{e.vendor_name_snapshot ?? "—"}</td>
-              <td className="py-2 text-slate-400">{e.category_name_snapshot}</td>
-              <td className="py-2">
-                {symbol}
-                {formatMinor(e.amount)}
-              </td>
-              <td className="py-2 text-slate-400">{e.deductible ? "Yes" : "No"}</td>
-              <td className="py-2 text-right">
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => onOpen(e)} className="text-sky-400 hover:underline">
-                    Edit
-                  </button>
-                  <button onClick={() => setDeleteTarget(e)} className="text-red-400 hover:underline">
-                    Delete
-                  </button>
-                </div>
-              </td>
+      <div className="card overflow-hidden">
+        <table className="table-base">
+          <thead>
+            <tr>
+              <th className="pl-4">Date</th>
+              <th>Vendor</th>
+              <th>Category</th>
+              <th className="text-right">Amount</th>
+              <th>Deductible</th>
+              <th className="pr-4"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {expenses?.map((e) => (
+              <tr key={e.id} className="is-hoverable">
+                <td className="pl-4">{e.date}</td>
+                <td className="text-text-secondary">{e.vendor_name_snapshot ?? "—"}</td>
+                <td className="text-text-secondary">{e.category_name_snapshot}</td>
+                <td className="tabular-nums text-right">
+                  {symbol}
+                  {formatMinor(e.amount)}
+                </td>
+                <td className="text-text-secondary">
+                  <span className={e.deductible ? "badge-success" : "badge-neutral"}>{e.deductible ? "Yes" : "No"}</span>
+                </td>
+                <td className="pr-4 text-right">
+                  <div className="flex justify-end gap-3">
+                    <button onClick={() => onOpen(e)} className="link inline-flex items-center gap-1">
+                      <PencilIcon className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(e)}
+                      className="inline-flex items-center gap-1 text-sm text-danger hover:underline"
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      {expenses !== null && expenses.length === 0 && (
-        <p className="text-sm text-slate-500">No expenses match these filters.</p>
-      )}
+        {expenses !== null && expenses.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-text-muted">No expenses match these filters.</p>
+        )}
+      </div>
 
       {deleteTarget && (
         <ConfirmDialog

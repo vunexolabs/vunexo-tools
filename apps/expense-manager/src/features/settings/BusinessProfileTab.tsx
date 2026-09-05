@@ -36,44 +36,39 @@ export function BusinessProfileTab() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md space-y-3">
+    <form onSubmit={handleSubmit} className="card max-w-md space-y-4 p-5">
       <ErrorBanner error={error} />
-      {saved && <p className="text-sm text-emerald-400">Saved.</p>}
+      {saved && <p className="text-sm text-success">Saved.</p>}
 
-      <label className="block text-sm">
-        Business name *
-        <input
-          required
-          value={current.name}
-          onChange={(e) => set("name", e.target.value)}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
-        />
-      </label>
-      <label className="block text-sm">
-        Address
+      <div>
+        <label className="label">Business name *</label>
+        <input required value={current.name} onChange={(e) => set("name", e.target.value)} className="input mt-1" />
+      </div>
+      <div>
+        <label className="label">Address</label>
         <input
           value={current.address ?? ""}
           onChange={(e) => set("address", e.target.value || null)}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+          className="input mt-1"
         />
-      </label>
-      <label className="block text-sm">
-        Tax info
+      </div>
+      <div>
+        <label className="label">Tax info</label>
         <input
           value={current.tax_info ?? ""}
           onChange={(e) => set("tax_info", e.target.value || null)}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+          className="input mt-1"
         />
-      </label>
-      <label className="block text-sm">
-        Currency symbol
+      </div>
+      <div>
+        <label className="label">Currency symbol</label>
         <input
           value={current.currency_symbol}
           onChange={(e) => set("currency_symbol", e.target.value)}
-          className="mt-1 w-24 rounded border border-slate-700 bg-slate-950 px-3 py-2"
+          className="input mt-1 w-24"
         />
-      </label>
-      <button type="submit" disabled={submitting || current.name.trim() === ""} className="rounded bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50">
+      </div>
+      <button type="submit" disabled={submitting || current.name.trim() === ""} className="btn-primary">
         {submitting ? "Saving…" : "Save"}
       </button>
     </form>

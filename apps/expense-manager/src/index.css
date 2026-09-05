@@ -1,3 +1,123 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --color-background: 248 250 252; /* slate-50 */
+  --color-surface: 255 255 255;
+  --color-surface-hover: 241 245 249; /* slate-100 */
+  --color-border: 226 232 240; /* slate-200 */
+  --color-text-primary: 15 23 42; /* slate-900 */
+  --color-text-secondary: 71 85 105; /* slate-600 */
+  --color-text-muted: 148 163 184; /* slate-400 */
+  --color-accent: 79 70 229; /* indigo-600 */
+  --color-accent-hover: 67 56 202; /* indigo-700 */
+  --color-danger: 220 38 38; /* red-600 */
+  --color-danger-hover: 185 28 28; /* red-700 */
+  --color-success: 22 163 74; /* green-600 */
+  --color-warning: 217 119 6; /* amber-600 */
+}
+
+.dark {
+  --color-background: 2 6 23; /* slate-950 */
+  --color-surface: 15 23 42; /* slate-900 */
+  --color-surface-hover: 30 41 59; /* slate-800 */
+  --color-border: 51 65 85; /* slate-700 */
+  --color-text-primary: 241 245 249; /* slate-100 */
+  --color-text-secondary: 148 163 184; /* slate-400 */
+  --color-text-muted: 100 116 139; /* slate-500 */
+  --color-accent: 99 102 241; /* indigo-500 */
+  --color-accent-hover: 129 140 248; /* indigo-400 */
+  --color-danger: 248 113 113; /* red-400 */
+  --color-danger-hover: 252 165 165; /* red-300 */
+  --color-success: 74 222 128; /* green-400 */
+  --color-warning: 251 191 36; /* amber-400 */
+}
+
+@layer base {
+  html {
+    @apply bg-background text-text-primary transition-colors duration-150;
+  }
+  body {
+    @apply antialiased transition-colors duration-150;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-white hover:bg-accent-hover;
+  }
+  .btn-secondary {
+    @apply btn border border-border bg-surface text-text-primary hover:bg-surface-hover;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:bg-danger-hover;
+  }
+  .btn-ghost {
+    @apply btn text-text-secondary hover:bg-surface-hover hover:text-text-primary;
+  }
+  .btn-sm {
+    @apply px-2.5 py-1.5 text-xs;
+  }
+
+  .input,
+  .select,
+  .textarea {
+    @apply w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50;
+  }
+
+  .card {
+    @apply rounded-lg border border-border bg-surface;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-text-secondary;
+  }
+
+  .page-header {
+    @apply mb-6 flex items-center justify-between gap-4;
+  }
+
+  .table-base {
+    @apply w-full border-collapse text-left text-sm;
+  }
+  .table-base thead th {
+    @apply border-b border-border pb-2 text-xs font-medium uppercase tracking-wide text-text-muted;
+  }
+  .table-base tbody tr {
+    @apply border-b border-border last:border-0;
+  }
+  .table-base tbody tr.is-hoverable:hover {
+    @apply bg-surface-hover;
+  }
+  .table-base td {
+    @apply py-3;
+  }
+
+  .link {
+    @apply text-accent hover:underline;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .badge-neutral {
+    @apply badge bg-surface-hover text-text-secondary;
+  }
+  .badge-success {
+    @apply badge bg-success/10 text-success;
+  }
+  .badge-warning {
+    @apply badge bg-warning/10 text-warning;
+  }
+  .badge-danger {
+    @apply badge bg-danger/10 text-danger;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}

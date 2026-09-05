@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { PlusIcon, TrashIcon } from "../../components/icons";
 import { useVendors } from "../../hooks/useVendors";
 import type { Vendor, VendorListItem } from "../../lib/tauri/types";
 import { VendorForm } from "./VendorForm";
@@ -28,10 +29,11 @@ export function VendorsList({ onOpen }: { onOpen: (id: number) => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <h1 className="text-xl font-semibold">Vendors</h1>
-        <button onClick={() => setEditing("new")} className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium">
-          + New Vendor
+        <button onClick={() => setEditing("new")} className="btn-primary">
+          <PlusIcon className="h-4 w-4" />
+          New Vendor
         </button>
       </div>
 
@@ -53,48 +55,54 @@ export function VendorsList({ onOpen }: { onOpen: (id: number) => void }) {
         />
       )}
 
-      <table className="w-full text-left text-sm">
-        <thead className="text-slate-400">
-          <tr>
-            <th className="pb-2">Name</th>
-            <th className="pb-2">Contact</th>
-            <th className="pb-2">Notes</th>
-            <th className="pb-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {vendors?.map((v) => (
-            <tr key={v.id} className="border-t border-slate-800">
-              <td className="py-2">{v.name}</td>
-              <td className="py-2 text-slate-400">{v.contact ?? "—"}</td>
-              <td className="py-2 text-slate-400">{v.notes ?? "—"}</td>
-              <td className="py-2 text-right">
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => onOpen(v.id)} className="text-sky-400 hover:underline">
-                    View
-                  </button>
-                  <button onClick={() => setEditing(v)} className="text-sky-400 hover:underline">
-                    Edit
-                  </button>
-                  {v.has_expenses ? (
-                    <span className="text-slate-600" title="Has expenses recorded — can't be deleted">
-                      Delete
-                    </span>
-                  ) : (
-                    <button onClick={() => setDeleteTarget(v)} className="text-red-400 hover:underline">
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </td>
+      <div className="card overflow-hidden">
+        <table className="table-base">
+          <thead>
+            <tr>
+              <th className="pl-4">Name</th>
+              <th>Contact</th>
+              <th>Notes</th>
+              <th className="pr-4"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {vendors?.map((v) => (
+              <tr key={v.id} className="is-hoverable">
+                <td className="pl-4">{v.name}</td>
+                <td className="text-text-secondary">{v.contact ?? "—"}</td>
+                <td className="text-text-secondary">{v.notes ?? "—"}</td>
+                <td className="pr-4 text-right">
+                  <div className="flex justify-end gap-3">
+                    <button onClick={() => onOpen(v.id)} className="link">
+                      View
+                    </button>
+                    <button onClick={() => setEditing(v)} className="link">
+                      Edit
+                    </button>
+                    {v.has_expenses ? (
+                      <span className="text-text-muted" title="Has expenses recorded — can't be deleted">
+                        Delete
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setDeleteTarget(v)}
+                        className="inline-flex items-center gap-1 text-sm text-danger hover:underline"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      {vendors !== null && vendors.length === 0 && (
-        <p className="text-sm text-slate-500">No vendors yet — click "+ New Vendor" to add one.</p>
-      )}
+        {vendors !== null && vendors.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-text-muted">No vendors yet — click "New Vendor" to add one.</p>
+        )}
+      </div>
 
       {deleteTarget && (
         <ConfirmDialog

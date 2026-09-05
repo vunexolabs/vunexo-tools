@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { ChevronLeftIcon, ReceiptIcon, TrashIcon } from "../../components/icons";
 import { Modal } from "../../components/Modal";
 import { SearchablePicker } from "../../components/SearchablePicker";
 import { useCategories } from "../../hooks/useCategories";
@@ -137,16 +138,17 @@ export function ExpenseEditor({
 
   return (
     <div className="max-w-xl space-y-4">
-      <button onClick={onBack} className="text-sm text-slate-400 hover:underline">
-        ← Back to Expenses
+      <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary">
+        <ChevronLeftIcon className="h-4 w-4" />
+        Back to Expenses
       </button>
       <h1 className="text-xl font-semibold">{saved ? "Edit Expense" : "New Expense"}</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-3 rounded border border-slate-700 bg-slate-900 p-4">
+      <form onSubmit={handleSubmit} className="card space-y-4 p-5">
         <ErrorBanner error={error} />
 
-        <label className="block text-sm">
-          Vendor (optional)
+        <div>
+          <label className="label">Vendor (optional)</label>
           <SearchablePicker
             items={(vendors ?? []).map((v) => ({ id: v.id, label: v.name }))}
             value={fields.vendor_id}
@@ -156,10 +158,10 @@ export function ExpenseEditor({
             onCreateNew={() => setQuickAdd("vendor")}
             className="mt-1"
           />
-        </label>
+        </div>
 
-        <label className="block text-sm">
-          Category *
+        <div>
+          <label className="label">Category *</label>
           <SearchablePicker
             items={(categories ?? []).map((c) => ({ id: c.id, label: c.name }))}
             value={fields.category_id || null}
@@ -176,25 +178,25 @@ export function ExpenseEditor({
             onCreateNew={() => setQuickAdd("category")}
             className="mt-1"
           />
-        </label>
+        </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block text-sm">
-            Date
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">Date</label>
             <input
               type="date"
               required
               value={fields.date}
               onChange={(e) => set("date", e.target.value)}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+              className="input mt-1"
             />
-          </label>
-          <label className="block text-sm">
-            Payment method
+          </div>
+          <div>
+            <label className="label">Payment method</label>
             <select
               value={fields.payment_method}
               onChange={(e) => set("payment_method", e.target.value)}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+              className="select mt-1"
             >
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>
@@ -202,70 +204,67 @@ export function ExpenseEditor({
                 </option>
               ))}
             </select>
-          </label>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block text-sm">
-            Amount ({symbol})
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">Amount ({symbol})</label>
             <input
               required
               inputMode="decimal"
               value={amountText}
               onChange={(e) => setAmountText(e.target.value)}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+              className="input mt-1"
             />
-          </label>
-          <label className="block text-sm">
-            Tax amount ({symbol})
-            <input
-              inputMode="decimal"
-              value={taxText}
-              onChange={(e) => setTaxText(e.target.value)}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
-            />
-          </label>
+          </div>
+          <div>
+            <label className="label">Tax amount ({symbol})</label>
+            <input inputMode="decimal" value={taxText} onChange={(e) => setTaxText(e.target.value)} className="input mt-1" />
+          </div>
         </div>
 
         <div className="flex gap-6">
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={fields.deductible} onChange={(e) => set("deductible", e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={fields.deductible}
+              onChange={(e) => set("deductible", e.target.checked)}
+              className="h-4 w-4 rounded border-border text-accent focus:ring-accent/50"
+            />
             Deductible
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={fields.itc_eligible} onChange={(e) => set("itc_eligible", e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={fields.itc_eligible}
+              onChange={(e) => set("itc_eligible", e.target.checked)}
+              className="h-4 w-4 rounded border-border text-accent focus:ring-accent/50"
+            />
             ITC-eligible
           </label>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-text-muted">
           Deductible and ITC-eligible are what you record, not a statutory determination — this app does not decide legal tax
           eligibility.
         </p>
 
-        <label className="block text-sm">
-          Notes
+        <div>
+          <label className="label">Notes</label>
           <textarea
             value={fields.notes ?? ""}
             onChange={(e) => set("notes", e.target.value || null)}
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+            className="textarea mt-1"
             rows={2}
           />
-        </label>
+        </div>
 
-        <div className="flex gap-2 pt-2">
-          <button
-            type="submit"
-            disabled={submitting || !fields.category_id}
-            className="rounded bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
-          >
+        <div className="flex gap-2 border-t border-border pt-4">
+          <button type="submit" disabled={submitting || !fields.category_id} className="btn-primary">
             {submitting ? "Saving…" : "Save"}
           </button>
           {saved && (
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(true)}
-              className="rounded border border-red-800 px-4 py-2 text-sm text-red-400"
-            >
+            <button type="button" onClick={() => setConfirmingDelete(true)} className="btn-secondary text-danger">
               Delete
             </button>
           )}
@@ -273,30 +272,23 @@ export function ExpenseEditor({
       </form>
 
       {saved && (
-        <div className="space-y-2 rounded border border-slate-700 bg-slate-900 p-4">
-          <h2 className="text-sm font-semibold text-slate-200">Receipt</h2>
+        <div className="card space-y-3 p-5">
+          <h2 className="text-sm font-semibold">Receipt</h2>
           <ErrorBanner error={receiptError} />
           {saved.receipt_path ? (
-            <p className="text-sm text-slate-400">
-              Attached: <span className="text-slate-200">{saved.receipt_path}</span>
+            <p className="flex items-center gap-2 text-sm text-text-secondary">
+              <ReceiptIcon className="h-4 w-4 shrink-0" />
+              Attached: <span className="text-text-primary">{saved.receipt_path}</span>
             </p>
           ) : (
-            <p className="text-sm text-slate-500">No receipt attached.</p>
+            <p className="text-sm text-text-muted">No receipt attached.</p>
           )}
           <div className="flex gap-2">
-            <button
-              onClick={() => void handleAttach()}
-              disabled={receiptBusy}
-              className="rounded border border-slate-700 px-3 py-1.5 text-sm disabled:opacity-50"
-            >
+            <button onClick={() => void handleAttach()} disabled={receiptBusy} className="btn-secondary btn-sm">
               {receiptBusy ? "Working…" : saved.receipt_path ? "Replace" : "Attach"}
             </button>
             {saved.receipt_path && (
-              <button
-                onClick={() => void handleRemoveReceipt()}
-                disabled={receiptBusy}
-                className="rounded border border-slate-700 px-3 py-1.5 text-sm disabled:opacity-50"
-              >
+              <button onClick={() => void handleRemoveReceipt()} disabled={receiptBusy} className="btn-secondary btn-sm">
                 Remove
               </button>
             )}
@@ -332,16 +324,17 @@ export function ExpenseEditor({
 
       {confirmingDelete && saved && (
         <Modal onClose={() => setConfirmingDelete(false)}>
-          <div className="space-y-3 rounded border border-slate-700 bg-slate-900 p-4">
+          <div className="card space-y-3 p-4">
             <h2 className="text-base font-semibold">Delete this expense?</h2>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-text-secondary">
               This permanently removes the expense and its receipt attachment, if any. This can't be undone.
             </p>
             <div className="flex gap-2 pt-2">
-              <button onClick={() => void handleDelete()} className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white">
+              <button onClick={() => void handleDelete()} className="btn-danger">
+                <TrashIcon className="h-4 w-4" />
                 Delete
               </button>
-              <button onClick={() => setConfirmingDelete(false)} className="rounded border border-slate-700 px-4 py-2 text-sm">
+              <button onClick={() => setConfirmingDelete(false)} className="btn-secondary">
                 Cancel
               </button>
             </div>

@@ -36,42 +36,30 @@ export function VendorForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded border border-slate-700 bg-slate-900 p-4">
+    <form onSubmit={handleSubmit} className="card space-y-3 p-4">
       <ErrorBanner error={error} />
-      <label className="block text-sm">
-        Name *
+      <div>
+        <label className="label">Name *</label>
         <input
           required
           value={fields.name}
           onChange={(e) => setFields((f) => ({ ...f, name: e.target.value }))}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+          className="input mt-1"
         />
-      </label>
-      <label className="block text-sm">
-        Contact
-        <input
-          defaultValue={fields.contact ?? ""}
-          onChange={set("contact")}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
-        />
-      </label>
-      <label className="block text-sm">
-        Notes
-        <input
-          defaultValue={fields.notes ?? ""}
-          onChange={set("notes")}
-          className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
-        />
-      </label>
+      </div>
+      <div>
+        <label className="label">Contact</label>
+        <input defaultValue={fields.contact ?? ""} onChange={set("contact")} className="input mt-1" />
+      </div>
+      <div>
+        <label className="label">Notes</label>
+        <input defaultValue={fields.notes ?? ""} onChange={set("notes")} className="input mt-1" />
+      </div>
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={submitting || fields.name.trim() === ""}
-          className="rounded bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
-        >
+        <button type="submit" disabled={submitting || fields.name.trim() === ""} className="btn-primary">
           {submitting ? "Saving…" : "Save"}
         </button>
-        <button type="button" onClick={onCancel} className="rounded border border-slate-700 px-4 py-2">
+        <button type="button" onClick={onCancel} className="btn-secondary">
           Cancel
         </button>
       </div>

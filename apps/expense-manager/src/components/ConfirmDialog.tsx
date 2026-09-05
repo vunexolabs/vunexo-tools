@@ -40,20 +40,16 @@ export function ConfirmDialog({
 
   return (
     <Modal onClose={onCancel}>
-      <div className="space-y-3 rounded border border-slate-700 bg-slate-900 p-4">
+      <div className="card space-y-3 p-4">
         <h2 className="text-base font-semibold">{title}</h2>
-        <p className="text-sm text-slate-400">{message}</p>
+        <p className="text-sm text-text-secondary">{message}</p>
         <ErrorBanner error={error} />
         {children}
         <div className="flex gap-2 pt-2">
-          <button
-            onClick={() => void handleConfirm()}
-            disabled={busy}
-            className={`rounded px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${danger ? "bg-red-600" : "bg-sky-600"}`}
-          >
+          <button onClick={() => void handleConfirm()} disabled={busy} className={danger ? "btn-danger" : "btn-primary"}>
             {busy ? "Working…" : confirmLabel}
           </button>
-          <button onClick={onCancel} disabled={busy} className="rounded border border-slate-700 px-4 py-2 text-sm disabled:opacity-50">
+          <button onClick={onCancel} disabled={busy} className="btn-secondary">
             Cancel
           </button>
         </div>

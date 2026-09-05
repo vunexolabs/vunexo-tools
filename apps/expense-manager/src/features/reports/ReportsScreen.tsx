@@ -145,14 +145,18 @@ export function ReportsScreen() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Reports</h1>
+      <div className="page-header">
+        <h1 className="text-xl font-semibold">Reports</h1>
+      </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3 text-sm">
+      <div className="flex flex-wrap gap-1 border-b border-border pb-3 text-sm">
         {REPORTS.map((r) => (
           <button
             key={r.id}
             onClick={() => setKind(r.id)}
-            className={`rounded px-3 py-1.5 ${kind === r.id ? "bg-slate-800" : "text-slate-400 hover:bg-slate-900"}`}
+            className={`rounded-md px-3 py-1.5 transition-colors ${
+              kind === r.id ? "bg-accent/10 font-medium text-accent" : "text-text-secondary hover:bg-surface-hover"
+            }`}
           >
             {r.label}
           </button>
@@ -161,79 +165,81 @@ export function ReportsScreen() {
 
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label className="flex flex-col gap-1">
-          From
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+          <span className="text-text-secondary">From</span>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="input" />
         </label>
         <label className="flex flex-col gap-1">
-          To
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1" />
+          <span className="text-text-secondary">To</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
         </label>
-        <button onClick={() => void run()} disabled={busy} className="rounded bg-emerald-600 px-4 py-1.5 font-medium disabled:opacity-50">
+        <button onClick={() => void run()} disabled={busy} className="btn-primary">
           {busy ? "Running…" : "Refresh"}
         </button>
         {result && (
-          <button onClick={() => void handleExport()} disabled={exporting} className="rounded border border-slate-700 px-3 py-1.5 disabled:opacity-50">
+          <button onClick={() => void handleExport()} disabled={exporting} className="btn-secondary">
             {exporting ? "Exporting…" : "Export CSV"}
           </button>
         )}
       </div>
 
       <ErrorBanner error={error} />
-      {done && <p className="text-sm text-emerald-400">{done}</p>}
-      <p className="text-xs text-slate-500">
+      {done && <p className="text-sm text-success">{done}</p>}
+      <p className="text-xs text-text-muted">
         This is what you recorded, not a statutory determination — Expense Manager does not decide legal tax deductibility or
         ITC eligibility.
       </p>
 
-      {result?.kind === "CATEGORY" && (
-        <ReportTable
-          rows={result.data.rows.map((r) => [r.category_name, `${symbol}${formatMinor(r.total_minor)}`])}
-          headers={["Category", "Total"]}
-          footer={["Total", `${symbol}${formatMinor(result.data.total_minor)}`]}
-        />
-      )}
-      {result?.kind === "PERIOD" && (
-        <ReportTable
-          rows={result.data.rows.map((r) => [r.period, `${symbol}${formatMinor(r.total_minor)}`])}
-          headers={["Period", "Total"]}
-          footer={["Total", `${symbol}${formatMinor(result.data.total_minor)}`]}
-        />
-      )}
-      {result?.kind === "DEDUCTIBLE" && (
-        <ReportTable
-          rows={[
-            ["Deductible", `${symbol}${formatMinor(result.data.deductible_minor)}`],
-            ["Non-Deductible", `${symbol}${formatMinor(result.data.non_deductible_minor)}`],
-          ]}
-          headers={["Classification", "Total"]}
-        />
-      )}
-      {result?.kind === "TAX_ITC" && (
-        <ReportTable
-          rows={[
-            ["Tax Paid", `${symbol}${formatMinor(result.data.tax_paid_minor)}`],
-            ["ITC-Eligible", `${symbol}${formatMinor(result.data.itc_eligible_minor)}`],
-          ]}
-          headers={["Measure", "Total"]}
-        />
-      )}
-      {result?.kind === "TOP_VENDORS" && (
-        <ReportTable
-          rows={result.data.rows.map((r) => [r.vendor_name_snapshot, `${symbol}${formatMinor(r.total_minor)}`])}
-          headers={["Vendor", "Total"]}
-        />
-      )}
+      <div className="card overflow-hidden">
+        {result?.kind === "CATEGORY" && (
+          <ReportTable
+            rows={result.data.rows.map((r) => [r.category_name, `${symbol}${formatMinor(r.total_minor)}`])}
+            headers={["Category", "Total"]}
+            footer={["Total", `${symbol}${formatMinor(result.data.total_minor)}`]}
+          />
+        )}
+        {result?.kind === "PERIOD" && (
+          <ReportTable
+            rows={result.data.rows.map((r) => [r.period, `${symbol}${formatMinor(r.total_minor)}`])}
+            headers={["Period", "Total"]}
+            footer={["Total", `${symbol}${formatMinor(result.data.total_minor)}`]}
+          />
+        )}
+        {result?.kind === "DEDUCTIBLE" && (
+          <ReportTable
+            rows={[
+              ["Deductible", `${symbol}${formatMinor(result.data.deductible_minor)}`],
+              ["Non-Deductible", `${symbol}${formatMinor(result.data.non_deductible_minor)}`],
+            ]}
+            headers={["Classification", "Total"]}
+          />
+        )}
+        {result?.kind === "TAX_ITC" && (
+          <ReportTable
+            rows={[
+              ["Tax Paid", `${symbol}${formatMinor(result.data.tax_paid_minor)}`],
+              ["ITC-Eligible", `${symbol}${formatMinor(result.data.itc_eligible_minor)}`],
+            ]}
+            headers={["Measure", "Total"]}
+          />
+        )}
+        {result?.kind === "TOP_VENDORS" && (
+          <ReportTable
+            rows={result.data.rows.map((r) => [r.vendor_name_snapshot, `${symbol}${formatMinor(r.total_minor)}`])}
+            headers={["Vendor", "Total"]}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
 function ReportTable({ headers, rows, footer }: { headers: string[]; rows: string[][]; footer?: string[] }) {
   return (
-    <table className="w-full text-left text-sm">
-      <thead className="text-slate-400">
+    <table className="table-base">
+      <thead>
         <tr>
-          {headers.map((h) => (
-            <th key={h} className="pb-2">
+          {headers.map((h, i) => (
+            <th key={h} className={`${i === 0 ? "pl-4" : ""} ${i === headers.length - 1 ? "pr-4 text-right" : ""}`}>
               {h}
             </th>
           ))}
@@ -241,9 +247,12 @@ function ReportTable({ headers, rows, footer }: { headers: string[]; rows: strin
       </thead>
       <tbody>
         {rows.map((row, i) => (
-          <tr key={i} className="border-t border-slate-800">
+          <tr key={i} className="is-hoverable">
             {row.map((cell, j) => (
-              <td key={j} className="py-2">
+              <td
+                key={j}
+                className={`tabular-nums ${j === 0 ? "pl-4" : ""} ${j === row.length - 1 ? "pr-4 text-right" : ""}`}
+              >
                 {cell}
               </td>
             ))}
@@ -251,7 +260,7 @@ function ReportTable({ headers, rows, footer }: { headers: string[]; rows: strin
         ))}
         {rows.length === 0 && (
           <tr>
-            <td colSpan={headers.length} className="py-4 text-center text-slate-500">
+            <td colSpan={headers.length} className="py-6 text-center text-text-muted">
               No data in this range.
             </td>
           </tr>
@@ -259,9 +268,12 @@ function ReportTable({ headers, rows, footer }: { headers: string[]; rows: strin
       </tbody>
       {footer && (
         <tfoot>
-          <tr className="border-t border-slate-700 font-semibold">
+          <tr className="border-t border-border font-semibold">
             {footer.map((cell, j) => (
-              <td key={j} className="py-2">
+              <td
+                key={j}
+                className={`tabular-nums py-3 ${j === 0 ? "pl-4" : ""} ${j === footer.length - 1 ? "pr-4 text-right" : ""}`}
+              >
                 {cell}
               </td>
             ))}
