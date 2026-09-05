@@ -1,0 +1,83 @@
+name: Release (Expense Manager)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "expense-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies (Tauri v2)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/expense-manager/src-tauri
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Set release metadata
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "disclaimer=" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "disclaimer=This is a development build, not an audited release." >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/expense-manager
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('expense-v0.0.0-manual{0}', github.run_number) }}
+          releaseName: "Vunexo Expense Manager ${{ github.ref_type == 'tag' && github.ref_name || format('(manual build #{0})', github.run_number) }}"
+          releaseBody: |
+            Built automatically by CI from commit ${{ github.sha }}.
+
+            Download the installer for your platform below:
+            - Windows: `.msi` or `-setup.exe`
+            - macOS: `.dmg`
+            - Linux: `.deb`, `.rpm`, or `.AppImage`
+
+            ${{ steps.meta.outputs.disclaimer }}
+          releaseDraft: false
+          prerelease: ${{ steps.meta.outputs.prerelease }}

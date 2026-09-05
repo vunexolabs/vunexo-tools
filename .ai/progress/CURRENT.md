@@ -1,10 +1,16 @@
-# Vunexo Billing — Current State
+# Vunexo Tools — Current State
 
 **Read this file first, every session — nothing else in this folder.** It's kept short on purpose: this file gets *overwritten* each session to reflect the latest state, it never grows. The daily files next to it (`YYYY-MM-DD.md`) are the append-only history — one file per day, immutable once the day is over — read one of those only if you need the *why* behind something listed here, not to reconstruct current state (this file already has that).
 
 **Standing instruction (2026-08-30): update this file at the end of every session that changes code**, and write/append that day's `YYYY-MM-DD.md` with what happened. Don't let this file grow into a log — if you're tempted to append here, that content belongs in today's dated file instead. See `feedback_progress_log` in the agent's own memory for the full instruction.
 
-Last updated: 2026-08-30.
+Last updated: 2026-09-05 (Billing section; see this date's edits for both projects — Expense Manager and Billing sessions ran independently the same day).
+
+This repo now holds two independent products — **Vunexo Billing** (`apps/vunexo-billing/`) and **Vunexo Expense Manager** (`apps/expense-manager/`), added 2026-09-05. They share no data and no runtime coupling; each has its own SQLite DB and business profile. Sections below are per-project.
+
+---
+
+# Vunexo Billing
 
 ## How this fits with the other `.ai/` files
 
@@ -43,8 +49,8 @@ Last commit is `1dedf6b`. Run `git status` before assuming the tree is clean.
 | UX audit fixes | — | ✅ `ConfirmDialog`, `SearchablePicker` + quick-add modals, live-updating totals, "Overdue" filter | — |
 | Currency/country | — (pure display config) | ✅ `lib/currency.ts` (60 countries), `hooks/useCurrency.tsx` (app-wide context), every screen money-format-aware | — |
 | Release readiness (license/CI/docs) | ✅ `LICENSE` (MIT), `ADR-002` dependency audit, `THIRD_PARTY_NOTICES.md`, `.github/workflows/ci.yml`, app `README.md` | n/a | CI workflow untested — no push to a remote has triggered it yet |
-| **V2 — Quote lifecycle + tax regime (Round 7, session 12)** | ✅ full lifecycle incl. `convert_quote_to_invoice`'s atomic 2-table transaction; `business.tax_regime_code`, `VAT_STANDARD` presentation (`present_vat`); wired into `main.rs`, 11 `commands::*_quote` Tauri commands live; `quote_number_format` read-only-after-first-issue lock enforced | ✅ Quotes List + Editor (mirrors Invoice Editor, editable in Draft only per the locked design), Quotes nav section, converting hands off into the Invoices section | 12 backend integration/unit tests; frontend verified via `typecheck`/`lint`/`build` only — **not manually clicked through the running app** |
-| **V2 — Statements, reports, reminders (Round 7 slice 7C–7G, session 12–13)** | ✅ `StatementRepository`/`ReportRepository` (SQL-aggregated, same discipline as `DashboardRepository`), `GenerateCustomerStatement`/`GenerateSalesReport`/`GenerateTaxSummaryReport`/`GenerateReminderMessage`; wired, 4 Tauri commands live; plus one small session-13 addition, `FileExportUseCases`/`write_export_file` (generic "write already-rendered text to a path" — backs the frontend-built Statement/Report CSV/JSON, since those are parameterized read models `ExportEntity`'s fixed-shape design doesn't cover) | ✅ Statement tab (`features/customers/CustomerDetail.tsx`, new — see gap below), Reports (`features/reports/`: Sales Summary + Tax Summary, new "Reports" nav section), Payment Reminder modal (`features/reminders/ReminderModal.tsx`, wired into Invoices List + Invoice Editor) | 6 backend integration tests incl. the opening/closing-balance reconciliation property across 3 real periods; frontend verified via `typecheck`/`lint`/`build` only — **not manually clicked through the running app** |
+| **V2 — Quote lifecycle + tax regime (Round 7, session 12)** | ✅ full lifecycle incl. `convert_quote_to_invoice`'s atomic 2-table transaction; `business.tax_regime_code`, `VAT_STANDARD` presentation (`present_vat`); wired into `main.rs`, 11 `commands::*_quote` Tauri commands live; `quote_number_format` read-only-after-first-issue lock enforced | ✅ Quotes List + Editor (mirrors Invoice Editor, editable in Draft only per the locked design), Quotes nav section, converting hands off into the Invoices section | 12 backend integration/unit tests; **manually clicked through the running app 2026-09-05 (session 14) — Draft → Issue → Accepted → Convert to Invoice all verified live, no errors** |
+| **V2 — Statements, reports, reminders (Round 7 slice 7C–7G, session 12–13)** | ✅ `StatementRepository`/`ReportRepository` (SQL-aggregated, same discipline as `DashboardRepository`), `GenerateCustomerStatement`/`GenerateSalesReport`/`GenerateTaxSummaryReport`/`GenerateReminderMessage`; wired, 4 Tauri commands live; plus one small session-13 addition, `FileExportUseCases`/`write_export_file` (generic "write already-rendered text to a path" — backs the frontend-built Statement/Report CSV/JSON, since those are parameterized read models `ExportEntity`'s fixed-shape design doesn't cover) | ✅ Statement tab (`features/customers/CustomerDetail.tsx`, new — see gap below), Reports (`features/reports/`: Sales Summary + Tax Summary, new "Reports" nav section), Payment Reminder modal (`features/reminders/ReminderModal.tsx`, wired into Invoices List + Invoice Editor) | 6 backend integration tests incl. the opening/closing-balance reconciliation property across 3 real periods; **Statement tab and both Reports screens manually verified live 2026-09-05 (session 14) against real data — see note below on the Reminder modal** |
 
 Backend: 134 tests passing (was 116 pre-V2), `cargo fmt`/`clippy` clean modulo the warnings below. Frontend: `pnpm typecheck`/`lint`/`build` all clean.
 
@@ -53,6 +59,10 @@ Backend: 134 tests passing (was 116 pre-V2), `cargo fmt`/`clippy` clean modulo t
 `ui-ux-v2.md §5` describes the Statement tab as an addition to an existing Overview/Invoices/Payments Customer Detail screen — that screen was never built in V1 (`CustomersList.tsx` only ever grew an inline edit form). Session 13 built the minimum `CustomerDetail.tsx` the design actually presupposes: **Overview + Statement only**, not Invoices/Payments (those exist as separate filterable views elsewhere; per-customer-filtered versions weren't part of this slice). Reachable via a new "Statement" row action on `CustomersList`. Worth knowing if a future session goes looking for per-customer Invoices/Payments tabs and doesn't find them — they were never built, not removed.
 
 Two smaller, disclosed gaps from the same session: the Payment Reminder's "Print / Save PDF" button is the OS print dialog (`window.print()`, scoped via `@media print`), not a generated `.pdf` file — there's no reminder PDF renderer in the backend, and the OS dialog's own "Save as PDF" already covers that half; and Reports/Statement CSV export goes through the new `write_export_file` generic command rather than `export_data`, since a parameterized report has no fixed `ExportEntity` shape to extend.
+
+### Session 14 (2026-09-05): V2 frontend manually verified live — the one gap from sessions 12–13 is now closed
+
+Quotes (full Draft → Issue → Accepted → Convert to Invoice lifecycle), the Customer Statement tab, and both Reports screens (Sales Summary, Tax Summary) were all driven in a real running `pnpm tauri dev` window (via macOS Accessibility/AppleScript UI scripting, since screenshot capture wasn't available in that environment) and confirmed working correctly against real existing data, with no console/runtime errors. **The Payment Reminder modal could not be triggered live**: no invoice in the current dataset has a past `due_date`, so `is_overdue` correctly evaluates false everywhere and the Remind button legitimately doesn't render anywhere right now — this was verified as *correct* behavior (checked directly against `reminders.rs`'s predicate and a specific invoice, `INV-2026-0008`), not a bug or an untested path. Manufacturing an overdue invoice to force the click-through was not attempted further: the date-picker's sub-widgets weren't reachable via accessibility scripting, and a direct SQL edit to backdate a real invoice was correctly declined as a destructive action on live data. **Net effect: Round 7 frontend is now considered fully verified**, with the Reminder modal's *rendering* still technically unconfirmed by eye (only its gating logic), pending either a naturally-occurring overdue invoice or a deliberate test one.
 
 ### Pre-existing harmless warnings (don't "fix" without a reason)
 
@@ -102,7 +112,8 @@ Two smaller, disclosed gaps from the same session: the Payment Reminder's "Print
 - **V2 Round 7 backend is entirely done, session 12** — Quote lifecycle (incl. `convert_quote_to_invoice`) and statements/reports/reminders (7C), all real, tested, and wired into `main.rs`/Tauri. 15 `commands::*` functions total across the two slices. 134 tests passing, `fmt`/`clippy` clean (3 warnings, all expected: `present_vat` has no caller yet since nothing renders a `VAT_STANDARD` PDF/report).
 - **V2 frontend, session 12 — Quotes.** `features/quotes/{QuotesList,QuoteEditor}.tsx`, `hooks/useQuotes.ts`, full type/command bridge (`lib/tauri/types.ts`/`commands.ts`), `QuoteStatusBadge`, Quotes as a new nav section in `App.tsx`. **One known, disclosed gap**: a Converted quote shows a plain note instead of a working link to the invoice it produced — no backend reverse-lookup (`quote → its invoice`) was built, since nothing in the locked design asked for one beyond display.
 - **V2 frontend, session 13 — Statement tab, Reports, Payment Reminder modal.** See the "Session 13's one real gap" note above for the new `CustomerDetail` screen's scope and the other two disclosed gaps. `typecheck`/`lint`/`build` all clean.
-- **Round 7 is now feature-complete, backend and frontend, across both sessions.** What's left is entirely human verification — **none of session 12 or 13's frontend work has been manually clicked through the running app** (no browser/UI-automation tool available in either session; verified via the type/build pipeline and the backend integration tests the screens call). Next up whenever a human has time: click through Quotes, the Statement tab, both Reports screens, and the Reminder modal in the real running app.
+- **Round 7 is now feature-complete and manually verified, session 14 (2026-09-05).** Quotes lifecycle, Statement tab, and both Reports screens confirmed working live against real data — see the "Session 14" note above. Only remaining thread: the Reminder modal's on-screen rendering hasn't been eyeballed (its gating logic has, and is correct) since no invoice is currently overdue — pick this up opportunistically whenever a real invoice goes overdue, or deliberately create a test one if it matters sooner.
+- Round 7 (Quotes + tax regime + statements/reports/reminders) can now be considered **done**, pending only that one cosmetic Reminder-modal-rendering confirmation. Next real decision point: what comes after V2 Round 7 — e.g. a fresh audit pass, multi-country tax work (still explicitly deferred), or something new the user wants prioritized.
 
 ## Verification commands (all of these, every slice)
 
@@ -116,8 +127,68 @@ pnpm typecheck && pnpm lint && pnpm build
 
 The user's `pnpm tauri dev` session tends to stay running for an entire work session (backend file-watcher auto-rebuilds, Vite HMR picks up frontend changes) — **check `ps aux | grep "tauri dev"` before launching a new one**, a second instance collides on port 1420. If one's already running, verify with the commands above and let the user reload/test in their live window instead of starting another.
 
+---
+
+# Vunexo Expense Manager
+
+Backend: Rust/Tauri/SQLx, `apps/expense-manager/src-tauri/`. Frontend: React/TS/Tailwind, `apps/expense-manager/src/`. Version `0.1.0` everywhere (`package.json`/`tauri.conf.json`/`Cargo.toml`) — not yet released, not yet manually verified.
+
+**How this fits with the other `.ai`/`docs` files**: `.ai/product-expense-manager.md` is the locked V1 spec (status: locked, round 1). `docs/expense-manager/{user-flows,database-schema,application-architecture,ui-ux,calculation-engine}.md` are Rounds 2–6, all locked, written and implemented in one session (2026-09-05) — see that day's file for the full narrative, including the four scope corrections the user made before locking Round 1.
+
+## Current state
+
+| Slice | Backend | Frontend | Tests |
+|---|---|---|---|
+| Business profile | ✅ CRUD | ✅ first-run setup gate + Settings tab | covered by integration tests |
+| Vendors | ✅ CRUD, `has_expenses` blocked-delete | ✅ Vendors List + Detail | ✅ |
+| Categories | ✅ CRUD, `has_expenses` blocked-delete, starter set seeded once on first run | ✅ single inline-edit table (mirrors Billing's Tax Rates) | ✅ (incl. seed-not-resurrected-after-delete) |
+| Expenses | ✅ CRUD, vendor/category name+deductibility snapshot on create only (never on update, except when re-picking a different vendor/category) | ✅ Expenses List + Editor | ✅ (incl. the snapshot-immutability rule, the one most likely to regress) |
+| Receipts | ✅ attach/replace/remove, app-managed relative path (`receipts/<uuid>.ext`) | ✅ file picker + preview in Expense Editor | ✅ (incl. replace never leaving a dangling reference) |
+| Dashboard | ✅ SQL-aggregated | ✅ this period's spend, category breakdown, recent expenses | ✅ |
+| Reports (Category/Period/Deductible/Tax-ITC/Top-Vendors) | ✅ SQL-aggregated, all 5 Round 6 test vectors covered | ✅ Reports screen, CSV export via `write_export_file` | ✅ |
+| Backup/restore | ✅ `.vex` archive incl. `receipts/` dir, `VACUUM INTO` | ✅ Settings → Data | ✅ (incl. receipt survives round-trip) |
+
+Backend: 40 tests passing, `cargo fmt`/`clippy` clean (one expected warning, same class as Billing's `ApplicationError::Infrastructure` dead-code warning). Frontend: `typecheck`/`lint`/`build` all clean (one expected `react-refresh/only-export-components` warning on `useCurrency.tsx`, same as Billing's).
+
+## Known gaps (disclosed, not oversights)
+
+- **Not manually clicked through in a running window** — no UI-automation tool available this session. Same disclosed-gap shape as Billing's own V2 frontend rounds (sessions 12–13).
+- Currency formatting assumes 2 decimal places always (`business.currency_symbol` has no decimals field) — a simplification, not a locked schema decision.
+- JSON export isn't wired to a UI button on Reports yet, though `write_export_file` itself is format-agnostic — only CSV has a trigger point.
+- No installer has ever been built; nobody has run this on real hardware.
+
+## Release readiness
+
+- `.github/workflows/ci.yml` has `frontend-expense-manager`/`backend-expense-manager` jobs (added 2026-09-05, alongside — not replacing — Billing's existing `frontend`/`backend` jobs).
+- `.github/workflows/release-expense-manager.yml` exists (tag prefix `expense-v*`, plus `workflow_dispatch`) but has never been triggered — no tag pushed, no manual dispatch run.
+- Nothing has been committed, pushed, tagged, or released yet — the 2026-09-05 session built and verified locally only.
+
+## History (agreed order)
+
+1. ~~Project started: spec through implementation, all in one session~~ — done 2026-09-05 (session 1). Full narrative, all nine rounds, and every disclosed deviation from the locked docs are in `2026-09-05.md`.
+
+## Next up
+
+- Human click-through of the running app (`pnpm tauri dev` from `apps/expense-manager/`) — the same first gap Billing had to close before anything else.
+- Decide when to commit/push this work.
+- Decide when (if) to actually run `release-expense-manager.yml` and cut a real build.
+- Revisit whether any Rust domain primitives (money newtype, currency handling) should become genuinely shared code between the two apps — deliberately deferred at Round 1 ("independent data ≠ zero shared code"), not decided.
+
+## Verification commands
+
+```bash
+# Backend, from apps/expense-manager/src-tauri/
+cargo build && cargo test --quiet && cargo fmt --check && cargo clippy --all-targets --quiet
+
+# Frontend, from apps/expense-manager/
+pnpm typecheck && pnpm lint && pnpm build
+```
+
+---
+
 ## Daily files in this folder
 
 - `2026-08-28.md` — Rounds 1–6 locked; Business/Customers/Products CRUD + calculation engine implemented.
 - `2026-08-29.md` — Invoices vertical slice (draft/issue/cancel/duplicate/list).
 - `2026-08-30.md` — thirteen sessions. Session 1: Payments, Dashboard, Settings, Tax Rates, EditIssuedInvoice, UX audit, currency/country support; the progress-tracking system itself was created. Session 2: PDF generation end to end. Session 3: backup/restore + CSV/JSON export (Settings → Data). Session 4: made `business.logo_path` app-managed so it survives a restore onto a different machine. Session 5: audited PDF generation against real invoice data — passed, no defects. Session 6: audited backup/restore against a real-data-shaped copy — passed, no defects. Session 7: fixed the two actionable known gaps (line-level discount UI, Dashboard Overdue click-through). Session 8: release readiness — license, CI, third-party notices, app README. Session 9: pushed to GitHub, fixed what CI's first real run caught (a cross-OS logo-path bug, plus a CI config bug), then built and published the first real installers via a new release workflow. Session 10: added the real Vunexo Billing logo — app icons, favicon, both READMEs, a public-facing Download section. Session 11: macOS build confirmed working on real hardware; cut and published the real `app-v1.0.0` release, fixing the release workflow so real tags publish as full (non-prerelease) releases. Session 12: all six V2 design rounds locked (product scope → user flows → schema → application architecture → UI/UX → calculation engine); Round 7 implementation done through Quotes lifecycle + `ConvertQuoteToInvoice`, `main.rs` wiring, 7C statement/report/reminder backend, and the Quotes frontend. Session 13: finished Round 7 — Statement tab, Reports screens, Payment Reminder modal, plus the small generic `write_export_file` backend addition their CSV/JSON export needed.
+- `2026-09-05.md` — Two independent threads. Expense Manager (Project #2) started and built end to end in one session: all nine rounds (spec → user flows → schema → architecture → UI/UX → calculation engine → implementation → testing → release readiness), 40 backend tests passing, `typecheck`/`lint`/`build` clean, not yet manually clicked through/committed/released. Separately, Billing session 14: V2 Round 7 frontend (Quotes, Statement tab, Reports) manually verified live in the running app for the first time — see "Session 14" in the Billing section above.
